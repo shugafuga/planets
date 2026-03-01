@@ -1,5 +1,7 @@
+# -*- coding: utf-8 -*-
 import sys
 import math
+import os
 from datetime import date, timedelta
 
 from PySide6.QtWidgets import (
@@ -38,38 +40,39 @@ DATE_MAX = date(2050, 12, 31)
 TOTAL_DAYS = (DATE_MAX - DATE_MIN).days
 
 # ---------------------------------------------------------------------------
-# Moon catalogue  (dist_fac = orbit radius as a multiple of the planet's half-size)
+# Moon catalogue  (dist_fac = orbit radius as a multiple of the planet's half-size;
+#                  au      = real orbital semi-major axis in AU)
 # ---------------------------------------------------------------------------
 MOONS = {
     "Earth": [
-        dict(name="Moon",     period=27.322, dist_fac= 8.0, size=2.5, color=QColor(180,180,180), mean_lon=  0),
+        dict(name="Moon",     period=27.322,  dist_fac= 8.0, au=0.002570, size=2.5, color=QColor(180,180,180), mean_lon=  0),
     ],
     "Mars": [
-        dict(name="Phobos",   period= 0.319, dist_fac= 5.0, size=1.5, color=QColor(160,140,120), mean_lon=  0),
-        dict(name="Deimos",   period= 1.263, dist_fac= 8.5, size=1.5, color=QColor(150,130,110), mean_lon=120),
+        dict(name="Phobos",   period= 0.319,  dist_fac= 5.0, au=0.000063, size=1.5, color=QColor(160,140,120), mean_lon=  0),
+        dict(name="Deimos",   period= 1.263,  dist_fac= 8.5, au=0.000157, size=1.5, color=QColor(150,130,110), mean_lon=120),
     ],
     "Jupiter": [
-        dict(name="Io",       period= 1.769, dist_fac= 5.5, size=2.0, color=QColor(220,180, 80), mean_lon=  0),
-        dict(name="Europa",   period= 3.551, dist_fac= 7.5, size=1.8, color=QColor(200,190,170), mean_lon= 90),
-        dict(name="Ganymede", period= 7.155, dist_fac=10.5, size=2.5, color=QColor(160,150,130), mean_lon=180),
-        dict(name="Callisto", period=16.690, dist_fac=14.5, size=2.2, color=QColor(120,110,100), mean_lon=270),
+        dict(name="Io",       period= 1.769,  dist_fac= 5.5, au=0.002819, size=2.0, color=QColor(220,180, 80), mean_lon=  0),
+        dict(name="Europa",   period= 3.551,  dist_fac= 7.5, au=0.004486, size=1.8, color=QColor(200,190,170), mean_lon= 90),
+        dict(name="Ganymede", period= 7.155,  dist_fac=10.5, au=0.007155, size=2.5, color=QColor(160,150,130), mean_lon=180),
+        dict(name="Callisto", period=16.690,  dist_fac=14.5, au=0.012588, size=2.2, color=QColor(120,110,100), mean_lon=270),
     ],
     "Saturn": [
-        dict(name="Enceladus",period= 1.370, dist_fac= 6.5, size=1.5, color=QColor(230,230,240), mean_lon=  0),
-        dict(name="Tethys",   period= 1.888, dist_fac= 8.5, size=1.8, color=QColor(210,210,220), mean_lon= 72),
-        dict(name="Dione",    period= 2.737, dist_fac=11.0, size=1.8, color=QColor(200,200,210), mean_lon=144),
-        dict(name="Rhea",     period= 4.518, dist_fac=13.5, size=2.0, color=QColor(190,185,180), mean_lon=216),
-        dict(name="Titan",    period=15.950, dist_fac=19.0, size=2.8, color=QColor(210,170, 90), mean_lon=288),
+        dict(name="Enceladus",period= 1.370,  dist_fac= 6.5, au=0.001592, size=1.5, color=QColor(230,230,240), mean_lon=  0),
+        dict(name="Tethys",   period= 1.888,  dist_fac= 8.5, au=0.001971, size=1.8, color=QColor(210,210,220), mean_lon= 72),
+        dict(name="Dione",    period= 2.737,  dist_fac=11.0, au=0.002524, size=1.8, color=QColor(200,200,210), mean_lon=144),
+        dict(name="Rhea",     period= 4.518,  dist_fac=13.5, au=0.003524, size=2.0, color=QColor(190,185,180), mean_lon=216),
+        dict(name="Titan",    period=15.950,  dist_fac=19.0, au=0.008169, size=2.8, color=QColor(210,170, 90), mean_lon=288),
     ],
     "Uranus": [
-        dict(name="Miranda",  period= 1.414, dist_fac= 5.0, size=1.5, color=QColor(170,200,210), mean_lon=  0),
-        dict(name="Ariel",    period= 2.520, dist_fac= 7.0, size=1.8, color=QColor(160,195,210), mean_lon= 90),
-        dict(name="Umbriel",  period= 4.144, dist_fac= 9.5, size=1.8, color=QColor(110,120,130), mean_lon=180),
-        dict(name="Titania",  period= 8.706, dist_fac=12.5, size=2.0, color=QColor(150,170,180), mean_lon=270),
-        dict(name="Oberon",   period=13.460, dist_fac=15.5, size=2.0, color=QColor(140,150,160), mean_lon= 45),
+        dict(name="Miranda",  period= 1.414,  dist_fac= 5.0, au=0.000865, size=1.5, color=QColor(170,200,210), mean_lon=  0),
+        dict(name="Ariel",    period= 2.520,  dist_fac= 7.0, au=0.001277, size=1.8, color=QColor(160,195,210), mean_lon= 90),
+        dict(name="Umbriel",  period= 4.144,  dist_fac= 9.5, au=0.001779, size=1.8, color=QColor(110,120,130), mean_lon=180),
+        dict(name="Titania",  period= 8.706,  dist_fac=12.5, au=0.002915, size=2.0, color=QColor(150,170,180), mean_lon=270),
+        dict(name="Oberon",   period=13.460,  dist_fac=15.5, au=0.003902, size=2.0, color=QColor(140,150,160), mean_lon= 45),
     ],
     "Neptune": [
-        dict(name="Triton",   period= 5.877, dist_fac= 8.5, size=2.2, color=QColor(170,190,220), mean_lon=  0),
+        dict(name="Triton",   period= 5.877,  dist_fac= 8.5, au=0.002372, size=2.2, color=QColor(170,190,220), mean_lon=  0),
     ],
 }
 
@@ -224,6 +227,8 @@ class SolarSystemWidget(QWidget):
         self.zodiac_font_scale = 1.0
         self.planet_scale = 1.0
         self._zodiac_names = STRINGS["en"]["zodiac_names"]
+        self.geo_mode = False
+        self.show_zodiac_sectors = False
         self.setMinimumSize(900, 900)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setStyleSheet("background-color: #06060f;")
@@ -256,6 +261,14 @@ class SolarSystemWidget(QWidget):
         self.planet_scale = scale
         self.update()
 
+    def set_geo_mode(self, enabled: bool):
+        self.geo_mode = enabled
+        self.update()
+
+    def set_show_zodiac_sectors(self, enabled: bool):
+        self.show_zodiac_sectors = enabled
+        self.update()
+
     # ------------------------------------------------------------------
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -271,32 +284,53 @@ class SolarSystemWidget(QWidget):
         max_au = 38.0
         scale = min(w, h) / 2.0 / max_au * 0.92 * self.zoom
 
-        painter.translate(cx, cy)
-
-        # Zodiac ring (drawn first, behind everything)
-        if self.show_zodiac:
-            self._draw_zodiac(painter, w, h)
-
-        # Sun glow
-        self._draw_sun(painter, scale)
-
-        # Orbits + planets
-        # In even mode orbits are spaced equally; actual AU used otherwise
         n = len(PLANETS)
         half_canvas = min(w, h) / 2.0
-        zodiac_inner = half_canvas * 0.80  # keep orbits inside zodiac ring
+        zodiac_inner = half_canvas * 0.80
         even_step = zodiac_inner / (n + 1)
 
+        # Zodiac ring and sector wedges are always fixed at screen centre
+        painter.save()
+        painter.translate(cx, cy)
+        if self.show_zodiac_sectors:
+            self._draw_zodiac_sectors(painter, w, h)
+        if self.show_zodiac:
+            self._draw_zodiac(painter, w, h)
+        painter.restore()
+
+        # Compute Earth's heliocentric pixel position for geocentric offset
+        earth_planet = next(p for p in PLANETS if p["name"] == "Earth")
+        earth_idx = PLANETS.index(earth_planet)
+        if self.even_mode:
+            earth_orbit_r = even_step * (earth_idx + 1)
+        else:
+            earth_orbit_r = earth_planet["au"] * scale
+        earth_angle = math.radians(planet_angle_deg(earth_planet, self.current_date))
+        earth_hx = earth_orbit_r * math.cos(earth_angle)
+        earth_hy = -earth_orbit_r * math.sin(earth_angle)
+
+        # Translate for planets: geocentric (Earth at centre) or heliocentric (Sun)
+        if self.geo_mode:
+            painter.translate(cx - earth_hx, cy - earth_hy)
+        else:
+            painter.translate(cx, cy)
+
+        # Sun glow (heliocentric origin; in geo mode it orbits Earth naturally)
+        self._draw_sun(painter, scale, even_step)
+
+        # Orbits + planets
         for idx, planet in enumerate(PLANETS):
             if self.even_mode:
                 orbit_r = even_step * (idx + 1)
             else:
                 orbit_r = planet["au"] * scale
-            self._draw_orbit(painter, orbit_r)
+            # Heliocentric circular orbits are only meaningful in heliocentric view
+            if not self.geo_mode:
+                self._draw_orbit(painter, orbit_r)
 
             angle_rad = math.radians(planet_angle_deg(planet, self.current_date))
             px = orbit_r * math.cos(angle_rad)
-            py = -orbit_r * math.sin(angle_rad)   # y-axis flipped in screen coords
+            py = -orbit_r * math.sin(angle_rad)
 
             self._draw_planet(painter, planet, px, py, scale)
 
@@ -305,6 +339,34 @@ class SolarSystemWidget(QWidget):
         self._draw_date_label(painter, w, h)
 
         painter.end()
+
+    def _draw_zodiac_sectors(self, painter, w, h):
+        """Full-radius translucent pie wedges + thin radial boundary lines."""
+        half = min(w, h) / 2.0
+        outer_r = half * 0.975
+        rect = QRectF(-outer_r, -outer_r, outer_r * 2, outer_r * 2)
+        for i, sign in enumerate(ZODIAC):
+            start = float(i * 30)
+            color = sign["color"]
+            alpha = 22 if i % 2 == 0 else 13
+            fill = QColor(color.red(), color.green(), color.blue(), alpha)
+            path = QPainterPath()
+            path.moveTo(0.0, 0.0)
+            path.arcTo(rect, start, 30.0)
+            path.closeSubpath()
+            painter.setBrush(QBrush(fill))
+            painter.setPen(Qt.NoPen)
+            painter.drawPath(path)
+        # Radial boundary lines
+        pen = QPen(QColor(255, 255, 255, 25))
+        pen.setWidthF(0.8)
+        painter.setPen(pen)
+        painter.setBrush(Qt.NoBrush)
+        for i in range(12):
+            angle = math.radians(i * 30)
+            painter.drawLine(QPointF(0.0, 0.0),
+                             QPointF(outer_r * math.cos(angle),
+                                     -outer_r * math.sin(angle)))
 
     def _draw_zodiac(self, painter, w, h):
         half    = min(w, h) / 2.0
@@ -392,9 +454,17 @@ class SolarSystemWidget(QWidget):
             painter.setPen(QPen(QColor(200, 210, 255, alpha)))
             painter.drawEllipse(QPointF(sx, sy), size, size)
 
-    def _draw_sun(self, painter, scale):
-        # Outer glow layers
-        for radius, alpha in [(60, 18), (45, 35), (32, 60), (22, 120)]:
+    def _draw_sun(self, painter, scale, even_step=0.0):
+        # In even mode use a fraction of even_step so the sun stays smaller
+        # than the nearest orbit ring.  In real mode scale proportionally with
+        # zoom (no hard upper cap so it shrinks correctly on zoom-out).
+        if self.even_mode and even_step > 0:
+            sun_r = even_step * 0.38          # ~38 % of the innermost even gap
+        else:
+            sun_r = max(6.0, scale * 0.12)    # real mode: ~12% of 1 AU, scales with zoom
+        glow_rs = [sun_r * 3.8, sun_r * 2.8, sun_r * 2.0, sun_r * 1.4]
+        alphas  = [18, 35, 60, 120]
+        for radius, alpha in zip(glow_rs, alphas):
             grad = QRadialGradient(QPointF(0, 0), radius)
             grad.setColorAt(0.0, QColor(255, 230, 100, alpha))
             grad.setColorAt(1.0, QColor(255, 150,  50,  0))
@@ -403,13 +473,14 @@ class SolarSystemWidget(QWidget):
             painter.drawEllipse(QPointF(0, 0), radius, radius)
 
         # Sun disk
-        grad = QRadialGradient(QPointF(-4, -4), 18)
+        offset = sun_r * 0.25
+        grad = QRadialGradient(QPointF(-offset, -offset), sun_r * 1.1)
         grad.setColorAt(0.0, QColor(255, 255, 200))
         grad.setColorAt(0.6, QColor(255, 200,  80))
         grad.setColorAt(1.0, QColor(230, 130,  30))
         painter.setBrush(QBrush(grad))
         painter.setPen(Qt.NoPen)
-        painter.drawEllipse(QPointF(0, 0), 16, 16)
+        painter.drawEllipse(QPointF(0, 0), sun_r, sun_r)
 
     def _draw_orbit(self, painter, r):
         pen = QPen(QColor(255, 255, 255, 30))
@@ -457,36 +528,50 @@ class SolarSystemWidget(QWidget):
         painter.drawText(QPointF(px + r + 3, py - r), planet["name"])
 
     def _draw_moons(self, painter, planet, px, py):
-        moons = MOONS.get(planet["name"], [])
-        if not moons:
+        p_moons = MOONS.get(planet["name"], [])
+        if not p_moons:
             return
         planet_r = planet["size"] / 2.0
         days = days_since_j2000(self.current_date)
-        for moon in moons:
-            orbit_r = planet_r * moon["dist_fac"]
-            # faint orbit ring
-            pen = QPen(QColor(255, 255, 255, 20))
-            pen.setWidth(1)
-            painter.setPen(pen)
-            painter.setBrush(Qt.NoBrush)
-            painter.drawEllipse(QPointF(px, py), orbit_r, orbit_r)
-            # moon position
-            ang = math.radians((moon["mean_lon"] + 360.0 * days / moon["period"]) % 360.0)
-            mx = px + orbit_r * math.cos(ang)
-            my = py - orbit_r * math.sin(ang)
-            mr = moon["size"] / 2.0
-            # glow
-            ggrad = QRadialGradient(QPointF(mx, my), mr * 2.2)
-            gc = QColor(moon["color"]); gc.setAlpha(50)
-            ggrad.setColorAt(0.0, gc)
-            ggrad.setColorAt(1.0, QColor(0, 0, 0, 0))
-            painter.setBrush(QBrush(ggrad))
-            painter.setPen(Qt.NoPen)
-            painter.drawEllipse(QPointF(mx, my), mr * 2.2, mr * 2.2)
-            # disk
-            painter.setBrush(QBrush(moon["color"]))
-            painter.setPen(Qt.NoPen)
-            painter.drawEllipse(QPointF(mx, my), mr, mr)
+
+        if self.even_mode:
+            # Visual spacing: proportional to dist_fac
+            for moon in p_moons:
+                orbit_r = planet_r * moon["dist_fac"]
+                self._draw_single_moon(painter, moon, px, py, orbit_r, days)
+        else:
+            # Real-proportions mode: scale so outermost moon sits at planet_r * 6,
+            # others proportional by actual AU. Minimum planet_r * 2 so tiny inner
+            # moons (Phobos etc.) stay visible.
+            max_au = max(m["au"] for m in p_moons)
+            for moon in p_moons:
+                orbit_r = max(planet_r * 2.0, planet_r * 6.0 * moon["au"] / max_au)
+                self._draw_single_moon(painter, moon, px, py, orbit_r, days)
+
+    def _draw_single_moon(self, painter, moon, px, py, orbit_r, days):
+        # faint orbit ring
+        pen = QPen(QColor(255, 255, 255, 20))
+        pen.setWidth(1)
+        painter.setPen(pen)
+        painter.setBrush(Qt.NoBrush)
+        painter.drawEllipse(QPointF(px, py), orbit_r, orbit_r)
+        # moon position
+        ang = math.radians((moon["mean_lon"] + 360.0 * days / moon["period"]) % 360.0)
+        mx = px + orbit_r * math.cos(ang)
+        my = py - orbit_r * math.sin(ang)
+        mr = moon["size"] / 2.0
+        # glow
+        ggrad = QRadialGradient(QPointF(mx, my), mr * 2.2)
+        gc = QColor(moon["color"]); gc.setAlpha(50)
+        ggrad.setColorAt(0.0, gc)
+        ggrad.setColorAt(1.0, QColor(0, 0, 0, 0))
+        painter.setBrush(QBrush(ggrad))
+        painter.setPen(Qt.NoPen)
+        painter.drawEllipse(QPointF(mx, my), mr * 2.2, mr * 2.2)
+        # disk
+        painter.setBrush(QBrush(moon["color"]))
+        painter.setPen(Qt.NoPen)
+        painter.drawEllipse(QPointF(mx, my), mr, mr)
 
     def _draw_saturn_rings(self, painter, px, py, r):
         pen = QPen(QColor(210, 190, 140, 160))
@@ -625,6 +710,19 @@ class MainWindow(QMainWindow):
         btn.setFont(QFont("Segoe UI Symbol", 11))
         return btn
 
+    def showEvent(self, event):
+        super().showEvent(event)
+        try:
+            import ctypes
+            hwnd = int(self.winId())
+            DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+            value = ctypes.c_int(1)
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE,
+                ctypes.byref(value), ctypes.sizeof(value))
+        except Exception:
+            pass
+
     # ------------------------------------------------------------------
     def _build_ui(self):
         central = QWidget()
@@ -719,6 +817,16 @@ class MainWindow(QMainWindow):
         self.btn_even = self._icon_btn("\u2261", "Equal orbit spacing", checkable=True)
         self.btn_even.toggled.connect(self._toggle_even)
         toolbar.addWidget(self.btn_even)
+
+        # Geocentric mode toggle  (♁ = Earth symbol U+2641)
+        self.btn_geo = self._icon_btn("\u2641", "Earth-centric view", checkable=True)
+        self.btn_geo.toggled.connect(self._toggle_geo)
+        toolbar.addWidget(self.btn_geo)
+
+        # Zodiac sector wedges toggle  (☸ = wheel/dharma U+2638)
+        self.btn_sectors = self._icon_btn("\u2638", "Show zodiac sector wedges", checkable=True)
+        self.btn_sectors.toggled.connect(self._toggle_zodiac_sectors)
+        toolbar.addWidget(self.btn_sectors)
 
         toolbar.addSpacing(8)
 
@@ -1001,6 +1109,14 @@ class MainWindow(QMainWindow):
         self.lbl_zoom.setVisible(not checked)
         self._save_settings()
 
+    def _toggle_geo(self, checked: bool):
+        self.canvas.set_geo_mode(checked)
+        self._save_settings()
+
+    def _toggle_zodiac_sectors(self, checked: bool):
+        self.canvas.set_show_zodiac_sectors(checked)
+        self._save_settings()
+
     def _toggle_marks(self, checked: bool):
         self.slider.set_show_marks(checked)
         self._save_settings()
@@ -1018,21 +1134,62 @@ class MainWindow(QMainWindow):
         self._save_settings()
 
     # ------------------------------------------------------------------
+    # Settings path: INI file next to the script for reliable cross-OS saves
+    @staticmethod
+    def _settings() -> QSettings:
+        ini = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.ini")
+        return QSettings(ini, QSettings.IniFormat)
+
     def _save_settings(self):
-        s = QSettings("planets", "SolarSystem")
-        s.setValue("zoom",             self.zoom_slider.value())
-        s.setValue("show_zodiac",      self.btn_zodiac.isChecked())
-        s.setValue("even_mode",        self.btn_even.isChecked())
-        s.setValue("slider_min",       self._slider_min.isoformat())
-        s.setValue("slider_max",       self._slider_max.isoformat())
-        s.setValue("language",         self._lang)
-        s.setValue("zodiac_font_scale", int(self._zodiac_font_scale * 100))
-        s.setValue("show_marks",       self.btn_marks.isChecked())
-        s.setValue("planet_scale",     self.planet_slider.value())
+        s = self._settings()
+        s.setValue("zoom",              self.zoom_slider.value())
+        s.setValue("show_zodiac",       self.btn_zodiac.isChecked())
+        s.setValue("even_mode",         self.btn_even.isChecked())
+        s.setValue("slider_min",        self._slider_min.isoformat())
+        s.setValue("slider_max",        self._slider_max.isoformat())
+        s.setValue("language",          self._lang)
+        s.setValue("zodiac_font_scale",  int(self._zodiac_font_scale * 100))
+        s.setValue("show_marks",        self.btn_marks.isChecked())
+        s.setValue("planet_scale",      self.planet_slider.value())
         s.setValue("min_align_planets", self._min_align_planets)
+        s.setValue("geo_mode",          self.btn_geo.isChecked())
+        s.setValue("zodiac_sectors",    self.btn_sectors.isChecked())
+        s.sync()
 
     def _load_settings(self):
-        s = QSettings("planets", "SolarSystem")
+        # Block all interactive-widget signals so that mid-load state changes
+        # (e.g. btn_even going False→True) don't trigger _save_settings() and
+        # overwrite the INI with partially-default values before we finish loading.
+        _blocked = [
+            self.btn_zodiac, self.btn_even, self.btn_geo, self.btn_sectors,
+            self.btn_marks, self.zoom_slider, self.planet_slider,
+        ]
+        for w in _blocked:
+            w.blockSignals(True)
+        try:
+            self._do_load_settings()
+        finally:
+            for w in _blocked:
+                w.blockSignals(False)
+            # Manually propagate every loaded state to canvas/widgets
+            # (signals were blocked, so handlers never fired during load)
+            self._zoom_changed(self.zoom_slider.value())
+            self._planet_scale_changed(self.planet_slider.value())
+            self.canvas.set_show_zodiac(self.btn_zodiac.isChecked())
+            self.canvas.set_even_mode(self.btn_even.isChecked())
+            self.canvas.set_geo_mode(self.btn_geo.isChecked())
+            self.canvas.set_show_zodiac_sectors(self.btn_sectors.isChecked())
+            self.slider.set_show_marks(self.btn_marks.isChecked())
+            # Zoom row visibility depends on even mode
+            even_on = self.btn_even.isChecked()
+            self._zoom_lbl_widget.setVisible(not even_on)
+            self.zoom_slider.setVisible(not even_on)
+            self.lbl_zoom.setVisible(not even_on)
+            # One clean save so the file is up to date
+            self._save_settings()
+
+    def _do_load_settings(self):
+        s = self._settings()
         try:
             zoom = int(s.value("zoom", 100))
             self.zoom_slider.setValue(zoom)
@@ -1087,6 +1244,16 @@ class MainWindow(QMainWindow):
                 self._min_align_planets = map_val
         except (TypeError, ValueError):
             pass
+        # Geo mode
+        geo = s.value("geo_mode", False)
+        if isinstance(geo, str):
+            geo = geo.lower() not in ("false", "0", "")
+        self.btn_geo.setChecked(bool(geo))
+        # Zodiac sectors
+        sectors = s.value("zodiac_sectors", False)
+        if isinstance(sectors, str):
+            sectors = sectors.lower() not in ("false", "0", "")
+        self.btn_sectors.setChecked(bool(sectors))
         # Compute alignment marks for initial range
         self._recompute_alignments()
 
