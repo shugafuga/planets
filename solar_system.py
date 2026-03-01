@@ -212,6 +212,12 @@ def planet_angle_deg(planet: dict, d: date) -> float:
     return (planet["mean_lon"] + 360.0 * days / planet["period"]) % 360.0
 
 
+def _lon_diff(a: float, b: float) -> float:
+    """Signed angular difference b - a, normalised to (-180, 180]."""
+    d = (b - a) % 360.0
+    return d - 360.0 if d > 180.0 else d
+
+
 # ---------------------------------------------------------------------------
 # Solar-system canvas
 # ---------------------------------------------------------------------------
@@ -229,6 +235,7 @@ class SolarSystemWidget(QWidget):
         self._zodiac_names = STRINGS["en"]["zodiac_names"]
         self.geo_mode = False
         self.show_zodiac_sectors = False
+        self.show_trail = False
         self.setMinimumSize(900, 900)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setStyleSheet("background-color: #06060f;")
@@ -265,6 +272,10 @@ class SolarSystemWidget(QWidget):
         self.geo_mode = enabled
         self.update()
 
+    def set_show_trail(self, enabled: bool):
+        self.show_trail = enabled
+        self.update()
+
     def set_show_zodiac_sectors(self, enabled: bool):
         self.show_zodiac_sectors = enabled
         self.update()
@@ -289,12 +300,12 @@ class SolarSystemWidget(QWidget):
         zodiac_inner = half_canvas * 0.80
         even_step = zodiac_inner / (n + 1)
 
-        # Zodiac ring and sector wedges are always fixed at screen centre
+        # Zodiac ring and sector wedges only shown in geocentric mode
         painter.save()
         painter.translate(cx, cy)
-        if self.show_zodiac_sectors:
+        if self.show_zodiac_sectors and self.geo_mode:
             self._draw_zodiac_sectors(painter, w, h)
-        if self.show_zodiac:
+        if self.show_zodiac and self.geo_mode:
             self._draw_zodiac(painter, w, h)
         painter.restore()
 
@@ -314,6 +325,10 @@ class SolarSystemWidget(QWidget):
             painter.translate(cx - earth_hx, cy - earth_hy)
         else:
             painter.translate(cx, cy)
+
+        # Geocentric trails (drawn first so they sit behind planets)
+        if self.show_trail and self.geo_mode:
+            self._draw_trails(painter, scale, earth_hx, earth_hy, even_step)
 
         # Sun glow (heliocentric origin; in geo mode it orbits Earth naturally)
         self._draw_sun(painter, scale, even_step)
@@ -340,6 +355,109 @@ class SolarSystemWidget(QWidget):
 
         painter.end()
 
+    # ------------------------------------------------------------------
+    def _draw_trails(self, painter, scale, earth_hx, earth_hy, even_step=0.0):
+        """Draw geocentric path trails + retrograde station markers."""
+        STEP = 5        # sample every N days
+        HALF = 550      # ±days from current date
+
+        earth_planet = next(p for p in PLANETS if p["name"] == "Earth")
+        earth_idx    = PLANETS.index(earth_planet)
+        cur_abs = (self.current_date - DATE_MIN).days
+
+        # Real-AU Earth radius (needed for retrograde lon detection always)
+        r_au_e = earth_planet["au"] * scale
+
+        for planet in PLANETS:
+            if planet["name"] == "Earth":
+                continue
+
+            p_idx = PLANETS.index(planet)
+            color = planet["color"]
+
+            # Visual radii must match how planets are drawn so trail aligns
+            r_vis_p = (even_step * (p_idx    + 1)) if self.even_mode else (planet["au"]       * scale)
+            r_vis_e = (even_step * (earth_idx + 1)) if self.even_mode else (earth_planet["au"] * scale)
+            # Real-AU planet radius for accurate retrograde (lon) detection
+            r_au_p  = planet["au"] * scale
+
+            pts = []    # (tx, ty, day_abs)
+            lons = []   # geocentric ecliptic longitude at each sample
+
+            lo = max(0, cur_abs - HALF)
+            hi = min(TOTAL_DAYS, cur_abs + HALF)
+            # Snap lo to the STEP grid so sample positions are frame-stable
+            lo = (lo // STEP) * STEP
+
+            for day_abs in range(lo, hi + 1, STEP):
+                d = DATE_MIN + timedelta(days=day_abs)
+
+                ang_p = math.radians(planet_angle_deg(planet,       d))
+                ang_e = math.radians(planet_angle_deg(earth_planet, d))
+
+                # Visual position (mode-aware) → painter trail coords
+                px_vis = r_vis_p * math.cos(ang_p)
+                py_vis = -r_vis_p * math.sin(ang_p)
+                ex_vis = r_vis_e * math.cos(ang_e)
+                ey_vis = -r_vis_e * math.sin(ang_e)
+                tx = px_vis - ex_vis + earth_hx
+                ty = py_vis - ey_vis + earth_hy
+
+                # Geocentric longitude from true AU positions (retrograde detection)
+                gx =  (r_au_p * math.cos(ang_p) - r_au_e * math.cos(ang_e))
+                gy = -(- r_au_p * math.sin(ang_p) + r_au_e * math.sin(ang_e))
+                lon = math.degrees(math.atan2(gy, gx)) % 360.0
+
+                pts.append((tx, ty, day_abs))
+                lons.append(lon)
+
+            if len(pts) < 3:
+                continue
+
+            n = len(pts)
+
+            # ── Draw trail polyline, past faded / future brighter ──────
+            pen = QPen()
+            pen.setWidthF(1.2)
+            pen.setCapStyle(Qt.RoundCap)
+            for i in range(n - 1):
+                x0, y0, d0 = pts[i]
+                x1, y1, d1 = pts[i + 1]
+                alpha = 50 if d0 < cur_abs else 100
+                pen.setColor(QColor(color.red(), color.green(), color.blue(), alpha))
+                painter.setPen(pen)
+                painter.drawLine(QPointF(x0, y0), QPointF(x1, y1))
+
+            # ── Detect retrograde station points ───────────────────────
+            # Use a 2-step window to reduce noise from angular wrap
+            stations = []
+            for i in range(1, n - 1):
+                d_prev = _lon_diff(lons[i - 1], lons[i])
+                d_next = _lon_diff(lons[i],     lons[i + 1])
+                if d_prev > 0.05 and d_next < -0.05:
+                    stations.append((pts[i][0], pts[i][1], pts[i][2], "retro"))
+                elif d_prev < -0.05 and d_next > 0.05:
+                    stations.append((pts[i][0], pts[i][1], pts[i][2], "direct"))
+
+            # ── Draw station markers with label ────────────────────────
+            font = QFont("Segoe UI", 7, QFont.Bold)
+            painter.setFont(font)
+            for sx, sy, sd, stype in stations:
+                if stype == "retro":
+                    dot_c  = QColor(255,  90,  50, 230)   # orange-red = begin retrograde
+                    lbl_c  = QColor(255, 160, 120, 220)
+                    lbl    = "R"
+                else:
+                    dot_c  = QColor( 60, 210, 170, 230)   # cyan-green = end retrograde
+                    lbl_c  = QColor(120, 230, 200, 220)
+                    lbl    = "D"
+                painter.setBrush(QBrush(dot_c))
+                painter.setPen(QPen(QColor(255, 255, 255, 140), 0.8))
+                painter.drawEllipse(QPointF(sx, sy), 4.5, 4.5)
+                painter.setPen(QPen(lbl_c))
+                painter.drawText(QPointF(sx + 6, sy + 4), lbl)
+
+    # ------------------------------------------------------------------
     def _draw_zodiac_sectors(self, painter, w, h):
         """Full-radius translucent pie wedges + thin radial boundary lines."""
         half = min(w, h) / 2.0
@@ -828,6 +946,11 @@ class MainWindow(QMainWindow):
         self.btn_sectors.toggled.connect(self._toggle_zodiac_sectors)
         toolbar.addWidget(self.btn_sectors)
 
+        # Geocentric trail + retrograde stations toggle  (⇌ = double arrows)
+        self.btn_trail = self._icon_btn("\u21cc", "Show geocentric trails & retrograde stations (geo mode)", checkable=True)
+        self.btn_trail.toggled.connect(self._toggle_trail)
+        toolbar.addWidget(self.btn_trail)
+
         toolbar.addSpacing(8)
 
         # Alignment nav
@@ -1117,6 +1240,10 @@ class MainWindow(QMainWindow):
         self.canvas.set_show_zodiac_sectors(checked)
         self._save_settings()
 
+    def _toggle_trail(self, checked: bool):
+        self.canvas.set_show_trail(checked)
+        self._save_settings()
+
     def _toggle_marks(self, checked: bool):
         self.slider.set_show_marks(checked)
         self._save_settings()
@@ -1154,6 +1281,7 @@ class MainWindow(QMainWindow):
         s.setValue("min_align_planets", self._min_align_planets)
         s.setValue("geo_mode",          self.btn_geo.isChecked())
         s.setValue("zodiac_sectors",    self.btn_sectors.isChecked())
+        s.setValue("show_trail",        self.btn_trail.isChecked())
         s.sync()
 
     def _load_settings(self):
@@ -1162,7 +1290,7 @@ class MainWindow(QMainWindow):
         # overwrite the INI with partially-default values before we finish loading.
         _blocked = [
             self.btn_zodiac, self.btn_even, self.btn_geo, self.btn_sectors,
-            self.btn_marks, self.zoom_slider, self.planet_slider,
+            self.btn_trail, self.btn_marks, self.zoom_slider, self.planet_slider,
         ]
         for w in _blocked:
             w.blockSignals(True)
@@ -1179,6 +1307,7 @@ class MainWindow(QMainWindow):
             self.canvas.set_even_mode(self.btn_even.isChecked())
             self.canvas.set_geo_mode(self.btn_geo.isChecked())
             self.canvas.set_show_zodiac_sectors(self.btn_sectors.isChecked())
+            self.canvas.set_show_trail(self.btn_trail.isChecked())
             self.slider.set_show_marks(self.btn_marks.isChecked())
             # Zoom row visibility depends on even mode
             even_on = self.btn_even.isChecked()
@@ -1254,6 +1383,11 @@ class MainWindow(QMainWindow):
         if isinstance(sectors, str):
             sectors = sectors.lower() not in ("false", "0", "")
         self.btn_sectors.setChecked(bool(sectors))
+        # Trail
+        trail = s.value("show_trail", False)
+        if isinstance(trail, str):
+            trail = trail.lower() not in ("false", "0", "")
+        self.btn_trail.setChecked(bool(trail))
         # Compute alignment marks for initial range
         self._recompute_alignments()
 
