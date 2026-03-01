@@ -1,0 +1,1140 @@
+import sys
+import math
+from datetime import date, timedelta
+
+from PySide6.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout,
+    QHBoxLayout, QSlider, QLabel, QPushButton, QSizePolicy,
+    QDialog, QCalendarWidget, QDialogButtonBox, QDateEdit, QFormLayout,
+    QSpinBox, QComboBox, QGroupBox,
+)
+from PySide6.QtCore import Qt, QTimer, QPointF, QRectF, QDate, Signal, QSettings, QThread
+from PySide6.QtGui import (
+    QPainter, QColor, QPen, QBrush, QFont,
+    QRadialGradient, QLinearGradient, QPainterPath,
+)
+from PySide6.QtWidgets import QStyle, QStyleOptionSlider
+
+# ---------------------------------------------------------------------------
+# Planet catalogue
+# J2000 reference epoch: 2000-01-01
+# mean_lon: mean ecliptic longitude at J2000 (degrees)
+# ---------------------------------------------------------------------------
+J2000 = date(2000, 1, 1)
+
+PLANETS = [
+    dict(name="Mercury", period=87.969,   au=0.39, color=QColor(180, 180, 185), size=5,  mean_lon=252.25),
+    dict(name="Venus",   period=224.701,  au=0.72, color=QColor(240, 190,  80), size=7,  mean_lon=181.98),
+    dict(name="Earth",   period=365.256,  au=1.00, color=QColor( 60, 140, 220), size=8,  mean_lon=100.46),
+    dict(name="Mars",    period=686.971,  au=1.52, color=QColor(200,  70,  50), size=6,  mean_lon=355.45),
+    dict(name="Jupiter", period=4332.59,  au=5.20, color=QColor(210, 145, 100), size=16, mean_lon= 34.40),
+    dict(name="Saturn",  period=10759.2,  au=9.58, color=QColor(210, 178, 110), size=13, mean_lon= 49.94),
+    dict(name="Uranus",  period=30688.5,  au=19.2, color=QColor(130, 210, 230), size=11, mean_lon=313.23),
+    dict(name="Neptune", period=60182.0,  au=30.1, color=QColor( 60,  80, 200), size=10, mean_lon=304.88),
+]
+
+DATE_MIN = date(2000,  1,  1)
+DATE_MAX = date(2050, 12, 31)
+TOTAL_DAYS = (DATE_MAX - DATE_MIN).days
+
+# ---------------------------------------------------------------------------
+# Moon catalogue  (dist_fac = orbit radius as a multiple of the planet's half-size)
+# ---------------------------------------------------------------------------
+MOONS = {
+    "Earth": [
+        dict(name="Moon",     period=27.322, dist_fac= 8.0, size=2.5, color=QColor(180,180,180), mean_lon=  0),
+    ],
+    "Mars": [
+        dict(name="Phobos",   period= 0.319, dist_fac= 5.0, size=1.5, color=QColor(160,140,120), mean_lon=  0),
+        dict(name="Deimos",   period= 1.263, dist_fac= 8.5, size=1.5, color=QColor(150,130,110), mean_lon=120),
+    ],
+    "Jupiter": [
+        dict(name="Io",       period= 1.769, dist_fac= 5.5, size=2.0, color=QColor(220,180, 80), mean_lon=  0),
+        dict(name="Europa",   period= 3.551, dist_fac= 7.5, size=1.8, color=QColor(200,190,170), mean_lon= 90),
+        dict(name="Ganymede", period= 7.155, dist_fac=10.5, size=2.5, color=QColor(160,150,130), mean_lon=180),
+        dict(name="Callisto", period=16.690, dist_fac=14.5, size=2.2, color=QColor(120,110,100), mean_lon=270),
+    ],
+    "Saturn": [
+        dict(name="Enceladus",period= 1.370, dist_fac= 6.5, size=1.5, color=QColor(230,230,240), mean_lon=  0),
+        dict(name="Tethys",   period= 1.888, dist_fac= 8.5, size=1.8, color=QColor(210,210,220), mean_lon= 72),
+        dict(name="Dione",    period= 2.737, dist_fac=11.0, size=1.8, color=QColor(200,200,210), mean_lon=144),
+        dict(name="Rhea",     period= 4.518, dist_fac=13.5, size=2.0, color=QColor(190,185,180), mean_lon=216),
+        dict(name="Titan",    period=15.950, dist_fac=19.0, size=2.8, color=QColor(210,170, 90), mean_lon=288),
+    ],
+    "Uranus": [
+        dict(name="Miranda",  period= 1.414, dist_fac= 5.0, size=1.5, color=QColor(170,200,210), mean_lon=  0),
+        dict(name="Ariel",    period= 2.520, dist_fac= 7.0, size=1.8, color=QColor(160,195,210), mean_lon= 90),
+        dict(name="Umbriel",  period= 4.144, dist_fac= 9.5, size=1.8, color=QColor(110,120,130), mean_lon=180),
+        dict(name="Titania",  period= 8.706, dist_fac=12.5, size=2.0, color=QColor(150,170,180), mean_lon=270),
+        dict(name="Oberon",   period=13.460, dist_fac=15.5, size=2.0, color=QColor(140,150,160), mean_lon= 45),
+    ],
+    "Neptune": [
+        dict(name="Triton",   period= 5.877, dist_fac= 8.5, size=2.2, color=QColor(170,190,220), mean_lon=  0),
+    ],
+}
+
+# ---------------------------------------------------------------------------
+# Zodiac signs – starting ecliptic longitude = index * 30°  (Aries = 0°)
+# ---------------------------------------------------------------------------
+ZODIAC = [
+    dict(name="Aries",       symbol="\u2648", color=QColor(220,  80,  80)),
+    dict(name="Taurus",      symbol="\u2649", color=QColor(100, 180,  80)),
+    dict(name="Gemini",      symbol="\u264a", color=QColor(220, 200,  60)),
+    dict(name="Cancer",      symbol="\u264b", color=QColor( 80, 160, 200)),
+    dict(name="Leo",         symbol="\u264c", color=QColor(230, 140,  40)),
+    dict(name="Virgo",       symbol="\u264d", color=QColor(160, 100, 200)),
+    dict(name="Libra",       symbol="\u264e", color=QColor( 80, 200, 180)),
+    dict(name="Scorpio",     symbol="\u264f", color=QColor(180,  40,  60)),
+    dict(name="Sagittarius", symbol="\u2650", color=QColor(200, 120,  60)),
+    dict(name="Capricorn",   symbol="\u2651", color=QColor( 80, 120, 160)),
+    dict(name="Aquarius",    symbol="\u2652", color=QColor( 60, 180, 220)),
+    dict(name="Pisces",      symbol="\u2653", color=QColor(140,  80, 200)),
+]
+
+# ---------------------------------------------------------------------------
+# Translations
+# ---------------------------------------------------------------------------
+STRINGS = {
+    "en": {
+        "title":         "Solar System Visualization",
+        "play":          "\u25b6  Play",
+        "pause":         "\u23f8  Pause",
+        "now":           "\u23f1 Now",
+        "pick_date":     "\U0001f4c5 Pick Date",
+        "zoom":          "Zoom:",
+        "zodiac":        "\u2648 Zodiac",
+        "even":          "\u2261 Even",
+        "settings":      "\u2699 Settings",
+        "align_label":   "Align:",
+        "align_tip":     "Jump to previous / next date where 3+ planets align within 15\u00b0",
+        "settings_title": "Settings",
+        "lang_label":    "Language:",
+        "zfont_label":   "Zodiac font size:",
+        "range_group":   "Time Slider Range",
+        "start_date":    "Start date:",
+        "end_date":      "End date:",
+        "ok":            "OK",
+        "cancel":        "Cancel",
+        "zodiac_names": ["Aries","Taurus","Gemini","Cancer","Leo","Virgo",
+                          "Libra","Scorpio","Sagittarius","Capricorn","Aquarius","Pisces"],
+    },
+    "uk": {
+        "title":         "\u0421\u043e\u043d\u044f\u0447\u043d\u0430 \u0441\u0438\u0441\u0442\u0435\u043c\u0430",
+        "play":          "\u25b6  \u0413\u0440\u0430\u0442\u0438",
+        "pause":         "\u23f8  \u041f\u0430\u0443\u0437\u0430",
+        "now":           "\u23f1 \u0417\u0430\u0440\u0430\u0437",
+        "pick_date":     "\U0001f4c5 \u0414\u0430\u0442\u0430",
+        "zoom":          "\u041c\u0430\u0441\u0448\u0442\u0430\u0431:",
+        "zodiac":        "\u2648 \u0417\u043e\u0434\u0456\u0430\u043a",
+        "even":          "\u2261 \u0420\u0456\u0432\u043d\u043e",
+        "settings":      "\u2699 \u041d\u0430\u043b\u0430\u0448\u0442\u0443\u0432\u0430\u043d\u043d\u044f",
+        "align_label":   "\u0420\u0456\u0432\u043d\u044f\u043d\u043d\u044f:",
+        "align_tip":     "\u041f\u0435\u0440\u0435\u0439\u0442\u0438 \u0434\u043e \u043f\u043e\u043f\u0435\u0440\u0435\u0434\u043d\u044c\u043e\u0433\u043e / \u043d\u0430\u0441\u0442\u0443\u043f\u043d\u043e\u0433\u043e \u0437\u0456\u0431\u0440\u0430\u043d\u043d\u044f \u043f\u043b\u0430\u043d\u0435\u0442 (3+ \u043f\u043b\u0430\u043d\u0435\u0442\u0438 \u0432 15\u00b0)",
+        "settings_title": "\u041d\u0430\u043b\u0430\u0448\u0442\u0443\u0432\u0430\u043d\u043d\u044f",
+        "lang_label":    "\u041c\u043e\u0432\u0430:",
+        "zfont_label":   "\u0420\u043e\u0437\u043c\u0456\u0440 \u0448\u0440\u0438\u0444\u0442\u0443 \u0437\u043e\u0434\u0456\u0430\u043a\u0443:",
+        "range_group":   "\u0414\u0456\u0430\u043f\u0430\u0437\u043e\u043d \u0447\u0430\u0441\u0443",
+        "start_date":    "\u041f\u043e\u0447\u0430\u0442\u043e\u043a:",
+        "end_date":      "\u041a\u0456\u043d\u0435\u0446\u044c:",
+        "ok":            "OK",
+        "cancel":        "\u0421\u043a\u0430\u0441\u0443\u0432\u0430\u0442\u0438",
+        "zodiac_names":  ["\u041e\u0432\u0435\u043d","\u0422\u0435\u043b\u0435\u0446\u044c",
+                          "\u0411\u043b\u0438\u0437\u043d\u044e\u043a\u0438","\u0420\u0430\u043a",
+                          "\u041b\u0435\u0432","\u0414\u0456\u0432\u0430",
+                          "\u0422\u0435\u0440\u0435\u0437\u0438","\u0421\u043a\u043e\u0440\u043f\u0456\u043e\u043d",
+                          "\u0421\u0442\u0440\u0456\u043b\u0435\u0446\u044c","\u041a\u043e\u0437\u0435\u0440\u0456\u0433",
+                          "\u0412\u043e\u0434\u043e\u043b\u0456\u0439","\u0420\u0438\u0431\u0438"],
+    },
+}
+
+
+# ---------------------------------------------------------------------------
+# Alignment detection  – days within a range where 3+ planets fit in <=15°
+# ---------------------------------------------------------------------------
+ALIGN_THRESHOLD = 15.0   # degrees
+ALIGN_COOLDOWN  = 7      # minimum days between separate events
+
+def _count_alignment(d: date, threshold: float = ALIGN_THRESHOLD) -> int:
+    """Return max number of planets simultaneously within a threshold-degree arc."""
+    angles = sorted(planet_angle_deg(p, d) for p in PLANETS)
+    n = len(angles)
+    ext = angles + [a + 360.0 for a in angles]
+    best = 0
+    for i in range(n):
+        j = i
+        while j < i + n and ext[j] - ext[i] <= threshold:
+            j += 1
+        best = max(best, j - i)
+    return best
+
+
+def _mark_color(count: int) -> QColor:
+    """Map planet-count to a cold→warm colour.  3=blue … 8=red."""
+    t = max(0.0, min(1.0, (count - 3) / 5.0))
+    if t < 0.33:
+        s = t / 0.33
+        r, g, b = int(30), int(80 + s * 140), int(255 - s * 175)
+    elif t < 0.67:
+        s = (t - 0.33) / 0.34
+        r, g, b = int(30 + s * 210), 220, int(80 - s * 50)
+    else:
+        s = (t - 0.67) / 0.33
+        r, g, b = 255, int(220 - s * 170), 30
+    return QColor(r, g, b, 220)
+
+
+def compute_alignments(d_min: date, d_max: date, min_planets: int = 3) -> list:
+    """Return sorted list of (day-offset, count) tuples where alignments occur."""
+    marks = []
+    total = (d_max - d_min).days
+    cooldown = 0
+    for offset in range(0, total + 1):
+        if cooldown > 0:
+            cooldown -= 1
+            continue
+        d = d_min + timedelta(days=offset)
+        cnt = _count_alignment(d)
+        if cnt >= min_planets:
+            marks.append((offset, cnt))
+            cooldown = ALIGN_COOLDOWN
+    return marks
+
+
+def days_since_j2000(d: date) -> float:
+    return (d - J2000).days
+
+
+def planet_angle_deg(planet: dict, d: date) -> float:
+    days = days_since_j2000(d)
+    return (planet["mean_lon"] + 360.0 * days / planet["period"]) % 360.0
+
+
+# ---------------------------------------------------------------------------
+# Solar-system canvas
+# ---------------------------------------------------------------------------
+class SolarSystemWidget(QWidget):
+    AU_SCALE = 22          # pixels per AU at default zoom
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.current_date = date.today()
+        self.zoom = 1.0
+        self.show_zodiac = True
+        self.even_mode = False
+        self.zodiac_font_scale = 1.0
+        self.planet_scale = 1.0
+        self._zodiac_names = STRINGS["en"]["zodiac_names"]
+        self.setMinimumSize(900, 900)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setStyleSheet("background-color: #06060f;")
+
+    def set_date(self, d: date):
+        self.current_date = d
+        self.update()
+
+    def set_zoom(self, factor: float):
+        self.zoom = factor
+        self.update()
+
+    def set_show_zodiac(self, visible: bool):
+        self.show_zodiac = visible
+        self.update()
+
+    def set_even_mode(self, enabled: bool):
+        self.even_mode = enabled
+        self.update()
+
+    def set_zodiac_font_scale(self, scale: float):
+        self.zodiac_font_scale = scale
+        self.update()
+
+    def set_zodiac_names(self, names: list):
+        self._zodiac_names = names
+        self.update()
+
+    def set_planet_scale(self, scale: float):
+        self.planet_scale = scale
+        self.update()
+
+    # ------------------------------------------------------------------
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        w, h = self.width(), self.height()
+        cx, cy = w / 2, h / 2
+
+        # Background starfield (deterministic)
+        self._draw_stars(painter, w, h)
+
+        # Scale: use max_au=38 so all orbits sit inside the zodiac band
+        max_au = 38.0
+        scale = min(w, h) / 2.0 / max_au * 0.92 * self.zoom
+
+        painter.translate(cx, cy)
+
+        # Zodiac ring (drawn first, behind everything)
+        if self.show_zodiac:
+            self._draw_zodiac(painter, w, h)
+
+        # Sun glow
+        self._draw_sun(painter, scale)
+
+        # Orbits + planets
+        # In even mode orbits are spaced equally; actual AU used otherwise
+        n = len(PLANETS)
+        half_canvas = min(w, h) / 2.0
+        zodiac_inner = half_canvas * 0.80  # keep orbits inside zodiac ring
+        even_step = zodiac_inner / (n + 1)
+
+        for idx, planet in enumerate(PLANETS):
+            if self.even_mode:
+                orbit_r = even_step * (idx + 1)
+            else:
+                orbit_r = planet["au"] * scale
+            self._draw_orbit(painter, orbit_r)
+
+            angle_rad = math.radians(planet_angle_deg(planet, self.current_date))
+            px = orbit_r * math.cos(angle_rad)
+            py = -orbit_r * math.sin(angle_rad)   # y-axis flipped in screen coords
+
+            self._draw_planet(painter, planet, px, py, scale)
+
+        # Date label (painted in widget coordinates, so undo translate)
+        painter.resetTransform()
+        self._draw_date_label(painter, w, h)
+
+        painter.end()
+
+    def _draw_zodiac(self, painter, w, h):
+        half    = min(w, h) / 2.0
+        outer_r = half * 0.975
+        inner_r = half * 0.80           # wider band for bigger text
+        label_r = (outer_r + inner_r) / 2.0
+        band_h  = outer_r - inner_r     # available band height in pixels
+
+        rect_out = QRectF(-outer_r, -outer_r, outer_r * 2, outer_r * 2)
+        rect_in  = QRectF(-inner_r, -inner_r, inner_r * 2, inner_r * 2)
+
+        for i, sign in enumerate(ZODIAC):
+            start = float(i * 30)
+            end   = start + 30.0
+            color = sign["color"]
+            fill  = QColor(color.red(), color.green(), color.blue(), 30 if i % 2 == 0 else 20)
+
+            # Annular sector
+            path = QPainterPath()
+            path.moveTo(inner_r * math.cos(math.radians(start)),
+                        -inner_r * math.sin(math.radians(start)))
+            path.lineTo(outer_r * math.cos(math.radians(start)),
+                        -outer_r * math.sin(math.radians(start)))
+            path.arcTo(rect_out, start, 30.0)
+            path.lineTo(inner_r * math.cos(math.radians(end)),
+                        -inner_r * math.sin(math.radians(end)))
+            path.arcTo(rect_in, end, -30.0)
+            path.closeSubpath()
+
+            painter.setBrush(QBrush(fill))
+            painter.setPen(Qt.NoPen)
+            painter.drawPath(path)
+
+            # Sector boundary line
+            pen = QPen(QColor(color.red(), color.green(), color.blue(), 70))
+            pen.setWidthF(1.0)
+            painter.setPen(pen)
+            painter.drawLine(
+                QPointF(inner_r * math.cos(math.radians(start)),
+                        -inner_r * math.sin(math.radians(start))),
+                QPointF(outer_r * math.cos(math.radians(start)),
+                        -outer_r * math.sin(math.radians(start)))
+            )
+
+            # Labels: big symbol glyph + name below
+            mid = start + 15.0
+            lx  = label_r * math.cos(math.radians(mid))
+            ly  = -label_r * math.sin(math.radians(mid))
+            painter.save()
+            painter.translate(lx, ly)
+            painter.rotate(-mid)
+
+            sym_h  = min(band_h * 0.52, 16) * self.zodiac_font_scale
+            name_h = min(band_h * 0.32, 11) * self.zodiac_font_scale
+            half_w = 30
+
+            # Symbol  (Segoe UI Symbol gives correct zodiac glyphs on Windows)
+            sym_font = QFont("Segoe UI Symbol", 0)
+            sym_font.setPixelSize(max(10, int(sym_h)))
+            painter.setFont(sym_font)
+            painter.setPen(QPen(QColor(color.red(), color.green(), color.blue(), 230)))
+            painter.drawText(QRectF(-half_w, -sym_h - 1, half_w * 2, sym_h + 2),
+                             Qt.AlignCenter, sign["symbol"])
+
+            # Name
+            name_font = QFont("Segoe UI", 0)
+            name_font.setPixelSize(max(7, int(name_h)))
+            painter.setFont(name_font)
+            painter.setPen(QPen(QColor(color.red(), color.green(), color.blue(), 170)))
+            lname = self._zodiac_names[i] if i < len(self._zodiac_names) else sign["name"]
+            painter.drawText(QRectF(-half_w, 1, half_w * 2, name_h + 2),
+                             Qt.AlignCenter, lname)
+            painter.restore()
+
+    # ------------------------------------------------------------------
+    def _draw_stars(self, painter, w, h):
+        import random
+        rng = random.Random(42)
+        for _ in range(250):
+            sx = rng.randint(0, w)
+            sy = rng.randint(0, h)
+            r = rng.random()
+            alpha = int(r * 70 + 20)   # darker stars
+            size = r * 1.6
+            painter.setPen(QPen(QColor(200, 210, 255, alpha)))
+            painter.drawEllipse(QPointF(sx, sy), size, size)
+
+    def _draw_sun(self, painter, scale):
+        # Outer glow layers
+        for radius, alpha in [(60, 18), (45, 35), (32, 60), (22, 120)]:
+            grad = QRadialGradient(QPointF(0, 0), radius)
+            grad.setColorAt(0.0, QColor(255, 230, 100, alpha))
+            grad.setColorAt(1.0, QColor(255, 150,  50,  0))
+            painter.setBrush(QBrush(grad))
+            painter.setPen(Qt.NoPen)
+            painter.drawEllipse(QPointF(0, 0), radius, radius)
+
+        # Sun disk
+        grad = QRadialGradient(QPointF(-4, -4), 18)
+        grad.setColorAt(0.0, QColor(255, 255, 200))
+        grad.setColorAt(0.6, QColor(255, 200,  80))
+        grad.setColorAt(1.0, QColor(230, 130,  30))
+        painter.setBrush(QBrush(grad))
+        painter.setPen(Qt.NoPen)
+        painter.drawEllipse(QPointF(0, 0), 16, 16)
+
+    def _draw_orbit(self, painter, r):
+        pen = QPen(QColor(255, 255, 255, 30))
+        pen.setWidth(1)
+        pen.setStyle(Qt.DotLine)
+        painter.setPen(pen)
+        painter.setBrush(Qt.NoBrush)
+        painter.drawEllipse(QPointF(0, 0), r, r)
+
+    def _draw_planet(self, painter, planet, px, py, scale):
+        color: QColor = planet["color"]
+        r = planet["size"] / 2.0 * self.planet_scale
+
+        # Planet glow
+        glow_r = r * 2.5
+        grad = QRadialGradient(QPointF(px, py), glow_r)
+        glow_color = QColor(color)
+        glow_color.setAlpha(60)
+        grad.setColorAt(0.0, glow_color)
+        grad.setColorAt(1.0, QColor(0, 0, 0, 0))
+        painter.setBrush(QBrush(grad))
+        painter.setPen(Qt.NoPen)
+        painter.drawEllipse(QPointF(px, py), glow_r, glow_r)
+
+        # Planet disk with subtle gradient
+        disk_grad = QRadialGradient(QPointF(px - r * 0.3, py - r * 0.3), r * 1.2)
+        lighter = color.lighter(150)
+        disk_grad.setColorAt(0.0, lighter)
+        disk_grad.setColorAt(1.0, color.darker(130))
+        painter.setBrush(QBrush(disk_grad))
+        painter.setPen(Qt.NoPen)
+        painter.drawEllipse(QPointF(px, py), r, r)
+
+        # Saturn rings
+        if planet["name"] == "Saturn":
+            self._draw_saturn_rings(painter, px, py, r)
+
+        # Moons
+        self._draw_moons(painter, planet, px, py)
+
+        # Label
+        font = QFont("Segoe UI", 7)
+        painter.setFont(font)
+        painter.setPen(QPen(color.lighter(160)))
+        painter.drawText(QPointF(px + r + 3, py - r), planet["name"])
+
+    def _draw_moons(self, painter, planet, px, py):
+        moons = MOONS.get(planet["name"], [])
+        if not moons:
+            return
+        planet_r = planet["size"] / 2.0
+        days = days_since_j2000(self.current_date)
+        for moon in moons:
+            orbit_r = planet_r * moon["dist_fac"]
+            # faint orbit ring
+            pen = QPen(QColor(255, 255, 255, 20))
+            pen.setWidth(1)
+            painter.setPen(pen)
+            painter.setBrush(Qt.NoBrush)
+            painter.drawEllipse(QPointF(px, py), orbit_r, orbit_r)
+            # moon position
+            ang = math.radians((moon["mean_lon"] + 360.0 * days / moon["period"]) % 360.0)
+            mx = px + orbit_r * math.cos(ang)
+            my = py - orbit_r * math.sin(ang)
+            mr = moon["size"] / 2.0
+            # glow
+            ggrad = QRadialGradient(QPointF(mx, my), mr * 2.2)
+            gc = QColor(moon["color"]); gc.setAlpha(50)
+            ggrad.setColorAt(0.0, gc)
+            ggrad.setColorAt(1.0, QColor(0, 0, 0, 0))
+            painter.setBrush(QBrush(ggrad))
+            painter.setPen(Qt.NoPen)
+            painter.drawEllipse(QPointF(mx, my), mr * 2.2, mr * 2.2)
+            # disk
+            painter.setBrush(QBrush(moon["color"]))
+            painter.setPen(Qt.NoPen)
+            painter.drawEllipse(QPointF(mx, my), mr, mr)
+
+    def _draw_saturn_rings(self, painter, px, py, r):
+        pen = QPen(QColor(210, 190, 140, 160))
+        for ring_r, width in [(r * 1.7, 2), (r * 2.1, 1.5), (r * 2.5, 1)]:
+            pen.setWidthF(width)
+            painter.setPen(pen)
+            painter.setBrush(Qt.NoBrush)
+            painter.drawEllipse(QPointF(px, py), ring_r, ring_r * 0.35)
+
+    def _draw_date_label(self, painter, w, h):
+        text = self.current_date.strftime("%B %d, %Y")
+        font = QFont("Segoe UI", 13, QFont.Bold)
+        painter.setFont(font)
+        painter.setPen(QPen(QColor(200, 220, 255, 210)))
+        painter.drawText(QRectF(10, h - 34, w - 20, 28), Qt.AlignLeft, text)
+
+
+# ---------------------------------------------------------------------------
+# Clickable label – emits doubleClicked on double-click
+# ---------------------------------------------------------------------------
+class _ClickableLabel(QLabel):
+    doubleClicked = Signal()
+
+    def mouseDoubleClickEvent(self, event):
+        self.doubleClicked.emit()
+        super().mouseDoubleClickEvent(event)
+
+
+# ---------------------------------------------------------------------------
+# Slider subclass: double-click signal + alignment mark painting
+# ---------------------------------------------------------------------------
+class _RangeSlider(QSlider):
+    doubleClicked = Signal()
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._marks: list = []
+        self._show_marks: bool = True
+
+    def set_marks(self, marks: list):
+        # marks is a list of (offset, count) tuples
+        self._marks = marks
+        self.update()
+
+    def set_show_marks(self, visible: bool):
+        self._show_marks = visible
+        self.update()
+
+    def mouseDoubleClickEvent(self, event):
+        self.doubleClicked.emit()
+        super().mouseDoubleClickEvent(event)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if not self._marks or not self._show_marks:
+            return
+        total = self.maximum() - self.minimum()
+        if total <= 0:
+            return
+        opt = QStyleOptionSlider()
+        self.initStyleOption(opt)
+        groove = self.style().subControlRect(
+            QStyle.CC_Slider, opt, QStyle.SC_SliderGroove, self)
+        gx = groove.x()
+        gw = groove.width()
+        gy = groove.center().y()
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        pen = QPen()
+        pen.setWidthF(1.5)
+        for offset, cnt in self._marks:
+            frac = (offset - self.minimum()) / total
+            x = int(gx + frac * gw)
+            pen.setColor(_mark_color(cnt))
+            painter.setPen(pen)
+            painter.drawLine(x, gy - 6, x, gy + 6)
+        painter.end()
+
+
+# ---------------------------------------------------------------------------
+# Main window
+# ---------------------------------------------------------------------------
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Solar System Visualization")
+        self.resize(960, 1000)
+        self.setStyleSheet("""
+            QMainWindow { background: #06060f; }
+            QWidget     { background: #06060f; color: #c8d8f0; }
+            QLabel      { color: #a0c0e8; font-family: 'Segoe UI'; font-size: 10pt; }
+            QPushButton {
+                background: #1a2a4a; color: #90c0e8;
+                border: 1px solid #2a4a7a; border-radius: 6px;
+                padding: 2px 6px; font-size: 10pt;
+            }
+            QPushButton:hover   { background: #253a60; }
+            QPushButton:pressed { background: #0e1a30; }
+            QPushButton:checked { background: #1a4a2a; border: 1px solid #2a8a4a; color: #60e880; }
+            QSlider::groove:horizontal {
+                height: 6px; background: #1a2a4a; border-radius: 3px;
+            }
+            QSlider::handle:horizontal {
+                background: #4a8ad0; border: 1px solid #6aaaf0;
+                width: 16px; height: 16px; margin: -5px 0;
+                border-radius: 8px;
+            }
+            QSlider::sub-page:horizontal {
+                background: #2a5a9a; border-radius: 3px;
+            }
+        """)
+
+        self._animation_timer = QTimer(self)
+        self._animation_timer.setInterval(40)          # ~25 fps
+        self._animation_timer.timeout.connect(self._advance_day)
+        self._anim_step = 1                            # days per tick (fixed 1d)
+        today = date.today()
+        self._slider_min = today
+        self._slider_max = date(today.year + 3, today.month, today.day)
+        self._lang = "en"
+        self._zodiac_font_scale = 1.0
+        self._alignment_marks: list = []
+        self._min_align_planets: int = 3
+
+        self._build_ui()
+        self._set_current_date(date.today())
+        self._load_settings()
+
+    # ------------------------------------------------------------------
+    def _icon_btn(self, icon: str, tip: str, w: int = 34, checkable: bool = False) -> QPushButton:
+        """Create a compact icon-only push button."""
+        btn = QPushButton(icon)
+        btn.setFixedSize(w, 30)
+        btn.setToolTip(tip)
+        btn.setCheckable(checkable)
+        btn.setFont(QFont("Segoe UI Symbol", 11))
+        return btn
+
+    # ------------------------------------------------------------------
+    def _build_ui(self):
+        central = QWidget()
+        self.setCentralWidget(central)
+        root = QVBoxLayout(central)
+        root.setContentsMargins(10, 10, 10, 10)
+        root.setSpacing(6)
+
+        # ── Canvas ──────────────────────────────────────────────────────
+        self.canvas = SolarSystemWidget()
+        root.addWidget(self.canvas, stretch=1)
+
+        # ── Slider row ──────────────────────────────────────────────────
+        slider_row = QHBoxLayout()
+        slider_row.setSpacing(8)
+
+        self.lbl_min = _ClickableLabel(self._slider_min.strftime("%Y-%m-%d"))
+        self.lbl_min.setFixedWidth(82)
+        self.lbl_min.setCursor(Qt.PointingHandCursor)
+        self.lbl_min.setToolTip("Double-click to change range start")
+        self.lbl_min.doubleClicked.connect(lambda: self._open_range_dialog("min"))
+        slider_row.addWidget(self.lbl_min)
+
+        self.slider = _RangeSlider(Qt.Horizontal)
+        self.slider.setRange(0, (self._slider_max - self._slider_min).days)
+        self.slider.valueChanged.connect(self._slider_moved)
+        self.slider.setToolTip("Drag to change date")
+        slider_row.addWidget(self.slider, stretch=1)
+
+        self.lbl_max = _ClickableLabel(self._slider_max.strftime("%Y-%m-%d"))
+        self.lbl_max.setFixedWidth(82)
+        self.lbl_max.setCursor(Qt.PointingHandCursor)
+        self.lbl_max.setToolTip("Double-click to change range end")
+        self.lbl_max.doubleClicked.connect(lambda: self._open_range_dialog("max"))
+        slider_row.addWidget(self.lbl_max)
+
+        root.addLayout(slider_row)
+
+        # ── Toolbar row (all buttons + inline sliders) ──────────────────
+        toolbar = QHBoxLayout()
+        toolbar.setSpacing(4)
+
+        # Play / Pause
+        self.btn_play = self._icon_btn("\u25b6", self._tr("play"), w=34)
+        self.btn_play.clicked.connect(self._toggle_play)
+        toolbar.addWidget(self.btn_play)
+
+        # Now
+        btn_now = self._icon_btn("\u29bf", "Jump to today")
+        btn_now.setObjectName("btn_now")
+        btn_now.clicked.connect(lambda: self._set_current_date(date.today()))
+        toolbar.addWidget(btn_now)
+
+        # Pick Date
+        btn_cal = self._icon_btn("\u25a6", self._tr("pick_date"))
+        btn_cal.setObjectName("btn_cal")
+        btn_cal.clicked.connect(self._open_calendar)
+        toolbar.addWidget(btn_cal)
+
+        # Settings
+        btn_settings = self._icon_btn("\u2699", self._tr("settings"))
+        btn_settings.setObjectName("btn_settings")
+        btn_settings.clicked.connect(self._open_settings)
+        toolbar.addWidget(btn_settings)
+
+        toolbar.addSpacing(10)
+
+        # Zoom label + slider + value
+        self._zoom_lbl_widget = QLabel(self._tr("zoom"))
+        self._zoom_lbl_widget.setObjectName("lbl_zoom_text")
+        toolbar.addWidget(self._zoom_lbl_widget)
+        self.zoom_slider = QSlider(Qt.Horizontal)
+        self.zoom_slider.setRange(100, 2500)
+        self.zoom_slider.setValue(100)
+        self.zoom_slider.setFixedWidth(150)
+        self.zoom_slider.setToolTip("Zoom")
+        self.zoom_slider.valueChanged.connect(self._zoom_changed)
+        toolbar.addWidget(self.zoom_slider)
+        self.lbl_zoom = QLabel("1.00\u00d7")
+        self.lbl_zoom.setFixedWidth(44)
+        toolbar.addWidget(self.lbl_zoom)
+
+        toolbar.addSpacing(8)
+
+        # Zodiac toggle
+        self.btn_zodiac = self._icon_btn("\u2648", "Toggle zodiac sectors", checkable=True)
+        self.btn_zodiac.setChecked(True)
+        self.btn_zodiac.toggled.connect(self._toggle_zodiac)
+        toolbar.addWidget(self.btn_zodiac)
+
+        # Even mode toggle
+        self.btn_even = self._icon_btn("\u2261", "Equal orbit spacing", checkable=True)
+        self.btn_even.toggled.connect(self._toggle_even)
+        toolbar.addWidget(self.btn_even)
+
+        toolbar.addSpacing(8)
+
+        # Alignment nav
+        self.lbl_align = QLabel(self._tr("align_label"))
+        self.lbl_align.setObjectName("lbl_align")
+        toolbar.addWidget(self.lbl_align)
+        self.btn_prev_align = self._icon_btn("\u25c4", self._tr("align_tip"), w=30)
+        self.btn_prev_align.clicked.connect(self._jump_prev_align)
+        toolbar.addWidget(self.btn_prev_align)
+        self.lbl_align_count = QLabel("0")
+        self.lbl_align_count.setFixedWidth(28)
+        self.lbl_align_count.setAlignment(Qt.AlignCenter)
+        self.lbl_align_count.setToolTip("Number of alignment events in range")
+        toolbar.addWidget(self.lbl_align_count)
+        self.btn_next_align = self._icon_btn("\u25ba", self._tr("align_tip"), w=30)
+        self.btn_next_align.clicked.connect(self._jump_next_align)
+        toolbar.addWidget(self.btn_next_align)
+
+        # Marks toggle
+        self.btn_marks = self._icon_btn("\u25cf", "Toggle alignment marks", w=30, checkable=True)
+        self.btn_marks.setChecked(True)
+        self.btn_marks.toggled.connect(self._toggle_marks)
+        toolbar.addWidget(self.btn_marks)
+
+        toolbar.addSpacing(8)
+
+        # Planet scale label + slider + value
+        lbl_p = QLabel("\u2295")
+        lbl_p.setFont(QFont("Segoe UI Symbol", 11))
+        lbl_p.setToolTip("Planet size scale")
+        toolbar.addWidget(lbl_p)
+        self.planet_slider = QSlider(Qt.Horizontal)
+        self.planet_slider.setRange(25, 400)
+        self.planet_slider.setValue(100)
+        self.planet_slider.setFixedWidth(110)
+        self.planet_slider.setToolTip("Scale planet sizes")
+        self.planet_slider.valueChanged.connect(self._planet_scale_changed)
+        toolbar.addWidget(self.planet_slider)
+        self.lbl_planet_scale = QLabel("1.00\u00d7")
+        self.lbl_planet_scale.setFixedWidth(44)
+        toolbar.addWidget(self.lbl_planet_scale)
+
+        toolbar.addStretch()
+        root.addLayout(toolbar)
+
+    # ------------------------------------------------------------------
+    def _set_current_date(self, d: date):
+        d = max(self._slider_min, min(self._slider_max, d))
+        self._current_date = d
+        days_offset = (d - self._slider_min).days
+        self.slider.blockSignals(True)
+        self.slider.setValue(days_offset)
+        self.slider.blockSignals(False)
+        self.canvas.set_date(d)
+
+    def _slider_moved(self, value: int):
+        d = self._slider_min + timedelta(days=value)
+        self._current_date = d
+        self.canvas.set_date(d)
+
+    def _toggle_play(self):
+        if self._animation_timer.isActive():
+            self._animation_timer.stop()
+            self.btn_play.setText("\u25b6")
+        else:
+            self._animation_timer.start()
+            self.btn_play.setText("\u23f8")
+
+    def _set_speed(self, days: int):
+        self._anim_step = days
+
+    def _advance_day(self):
+        total = (self._slider_max - self._slider_min).days
+        new_val = self.slider.value() + self._anim_step
+        if new_val > total:
+            new_val = 0
+        self.slider.setValue(new_val)
+
+    # ------------------------------------------------------------------
+    def _set_slider_range(self, new_min: date, new_max: date):
+        self._slider_min = new_min
+        self._slider_max = new_max
+        total = (new_max - new_min).days
+        cur_offset = max(0, min(total, (self._current_date - new_min).days))
+        self.slider.blockSignals(True)
+        self.slider.setRange(0, total)
+        self.slider.setValue(cur_offset)
+        self.slider.blockSignals(False)
+        self.lbl_min.setText(new_min.strftime("%Y-%m-%d"))
+        self.lbl_max.setText(new_max.strftime("%Y-%m-%d"))
+        self.canvas.set_date(new_min + timedelta(days=cur_offset))
+        self._recompute_alignments()
+
+    def _open_range_dialog(self, side: str = ""):
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Set Slider Range")
+        dlg.setStyleSheet(self.styleSheet())
+        vbox = QVBoxLayout(dlg)
+        form = QFormLayout()
+        de_min = QDateEdit(QDate(self._slider_min.year, self._slider_min.month, self._slider_min.day))
+        de_max = QDateEdit(QDate(self._slider_max.year, self._slider_max.month, self._slider_max.day))
+        for de in (de_min, de_max):
+            de.setCalendarPopup(True)
+            de.setDisplayFormat("yyyy-MM-dd")
+            de.setMinimumWidth(130)
+        form.addRow("Start date:", de_min)
+        form.addRow("End date:",   de_max)
+        vbox.addLayout(form)
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(dlg.accept)
+        btns.rejected.connect(dlg.reject)
+        vbox.addWidget(btns)
+        # Focus the relevant field
+        if side == "min":
+            de_min.setFocus()
+        elif side == "max":
+            de_max.setFocus()
+        if dlg.exec() == QDialog.Accepted:
+            qmin, qmax = de_min.date(), de_max.date()
+            new_min = date(qmin.year(), qmin.month(), qmin.day())
+            new_max = date(qmax.year(), qmax.month(), qmax.day())
+            if new_max > new_min:
+                self._set_slider_range(new_min, new_max)
+                self._save_settings()
+
+    # ------------------------------------------------------------------
+    # Internationalisation
+    # ------------------------------------------------------------------
+    def _tr(self, key: str) -> str:
+        return STRINGS.get(self._lang, STRINGS["en"]).get(key, key)
+
+    def _apply_language(self):
+        self.setWindowTitle(self._tr("title"))
+        # Update tooltip text for icon buttons
+        for obj_name, key in [
+            ("btn_now",      "now"),
+            ("btn_cal",      "pick_date"),
+            ("btn_settings", "settings"),
+        ]:
+            btn = self.findChild(QPushButton, obj_name)
+            if btn:
+                btn.setToolTip(self._tr(key))
+        for obj_name, key in [("lbl_align", "align_label")]:
+            lbl = self.findChild(QLabel, obj_name)
+            if lbl:
+                lbl.setText(self._tr(key))
+        is_play = not self._animation_timer.isActive()
+        self.btn_play.setText("\u25b6" if is_play else "\u23f8")
+        self.btn_zodiac.setToolTip(self._tr("zodiac"))
+        self.btn_even.setToolTip(self._tr("even"))
+        # Update zoom label
+        lbl = self.findChild(QLabel, "lbl_zoom_text")
+        if lbl:
+            lbl.setText(self._tr("zoom"))
+        # Update zodiac names on canvas
+        self.canvas.set_zodiac_names(self._tr("zodiac_names"))
+
+    # ------------------------------------------------------------------
+    # Settings dialog
+    # ------------------------------------------------------------------
+    def _open_settings(self):
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self._tr("settings_title"))
+        dlg.setStyleSheet(self.styleSheet())
+        dlg.setMinimumWidth(340)
+        vbox = QVBoxLayout(dlg)
+
+        form = QFormLayout()
+        form.setSpacing(10)
+
+        # Language
+        cmb_lang = QComboBox()
+        cmb_lang.addItem("English", "en")
+        cmb_lang.addItem("\u0423\u043a\u0440\u0430\u0457\u043d\u0441\u044c\u043a\u0430", "uk")
+        cur_idx = cmb_lang.findData(self._lang)
+        if cur_idx >= 0:
+            cmb_lang.setCurrentIndex(cur_idx)
+        form.addRow(self._tr("lang_label"), cmb_lang)
+
+        # Zodiac font size  (50 – 200 %)
+        spn_font = QSpinBox()
+        spn_font.setRange(50, 200)
+        spn_font.setSuffix(" %")
+        spn_font.setValue(int(self._zodiac_font_scale * 100))
+        form.addRow(self._tr("zfont_label"), spn_font)
+
+        # Min aligned planets for marks (3 – 8)
+        spn_min_align = QSpinBox()
+        spn_min_align.setRange(3, 8)
+        spn_min_align.setValue(self._min_align_planets)
+        spn_min_align.setToolTip("Minimum number of planets in alignment to show a mark")
+        form.addRow("Min planets (marks):", spn_min_align)
+
+        vbox.addLayout(form)
+
+        # Time slider range group
+        grp = QGroupBox(self._tr("range_group"))
+        grp.setStyleSheet("QGroupBox { color: #80a0c0; font-size: 9pt; }")
+        gform = QFormLayout(grp)
+        de_min = QDateEdit(QDate(self._slider_min.year,
+                                 self._slider_min.month,
+                                 self._slider_min.day))
+        de_max = QDateEdit(QDate(self._slider_max.year,
+                                 self._slider_max.month,
+                                 self._slider_max.day))
+        for de in (de_min, de_max):
+            de.setCalendarPopup(True)
+            de.setDisplayFormat("yyyy-MM-dd")
+            de.setMinimumWidth(140)
+        gform.addRow(self._tr("start_date"), de_min)
+        gform.addRow(self._tr("end_date"),   de_max)
+        vbox.addWidget(grp)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(dlg.accept)
+        btns.rejected.connect(dlg.reject)
+        vbox.addWidget(btns)
+
+        if dlg.exec() != QDialog.Accepted:
+            return
+
+        # Apply language
+        new_lang = cmb_lang.currentData()
+        if new_lang != self._lang:
+            self._lang = new_lang
+            self._apply_language()
+
+        # Apply zodiac font
+        new_scale = spn_font.value() / 100.0
+        if new_scale != self._zodiac_font_scale:
+            self._zodiac_font_scale = new_scale
+            self.canvas.set_zodiac_font_scale(new_scale)
+
+        # Apply min aligned planets
+        new_min_align = spn_min_align.value()
+        if new_min_align != self._min_align_planets:
+            self._min_align_planets = new_min_align
+            self._recompute_alignments()
+
+        # Apply date range
+        qmin, qmax = de_min.date(), de_max.date()
+        new_min = date(qmin.year(), qmin.month(), qmin.day())
+        new_max = date(qmax.year(), qmax.month(), qmax.day())
+        if new_max > new_min and (new_min != self._slider_min or new_max != self._slider_max):
+            self._set_slider_range(new_min, new_max)
+
+        self._save_settings()
+
+    # ------------------------------------------------------------------
+    # Alignment marks
+    # ------------------------------------------------------------------
+    def _recompute_alignments(self):
+        self._alignment_marks = compute_alignments(
+            self._slider_min, self._slider_max, self._min_align_planets)
+        self.slider.set_marks(self._alignment_marks)
+        self.lbl_align_count.setText(str(len(self._alignment_marks)))
+
+    def _jump_prev_align(self):
+        cur = self.slider.value()
+        prev = [m[0] for m in self._alignment_marks if m[0] < cur]
+        if prev:
+            self.slider.setValue(prev[-1])
+
+    def _jump_next_align(self):
+        cur = self.slider.value()
+        nxt = [m[0] for m in self._alignment_marks if m[0] > cur]
+        if nxt:
+            self.slider.setValue(nxt[0])
+
+    # ------------------------------------------------------------------
+    def _toggle_zodiac(self, checked: bool):
+        self.canvas.set_show_zodiac(checked)
+        self._save_settings()
+
+    def _toggle_even(self, checked: bool):
+        self.canvas.set_even_mode(checked)
+        self._zoom_lbl_widget.setVisible(not checked)
+        self.zoom_slider.setVisible(not checked)
+        self.lbl_zoom.setVisible(not checked)
+        self._save_settings()
+
+    def _toggle_marks(self, checked: bool):
+        self.slider.set_show_marks(checked)
+        self._save_settings()
+
+    def _planet_scale_changed(self, value: int):
+        scale = value / 100.0
+        self.lbl_planet_scale.setText(f"{scale:.2f}\u00d7")
+        self.canvas.set_planet_scale(scale)
+        self._save_settings()
+
+    def _zoom_changed(self, value: int):
+        factor = value / 100.0
+        self.lbl_zoom.setText(f"{factor:.2f}×")
+        self.canvas.set_zoom(factor)
+        self._save_settings()
+
+    # ------------------------------------------------------------------
+    def _save_settings(self):
+        s = QSettings("planets", "SolarSystem")
+        s.setValue("zoom",             self.zoom_slider.value())
+        s.setValue("show_zodiac",      self.btn_zodiac.isChecked())
+        s.setValue("even_mode",        self.btn_even.isChecked())
+        s.setValue("slider_min",       self._slider_min.isoformat())
+        s.setValue("slider_max",       self._slider_max.isoformat())
+        s.setValue("language",         self._lang)
+        s.setValue("zodiac_font_scale", int(self._zodiac_font_scale * 100))
+        s.setValue("show_marks",       self.btn_marks.isChecked())
+        s.setValue("planet_scale",     self.planet_slider.value())
+        s.setValue("min_align_planets", self._min_align_planets)
+
+    def _load_settings(self):
+        s = QSettings("planets", "SolarSystem")
+        try:
+            zoom = int(s.value("zoom", 100))
+            self.zoom_slider.setValue(zoom)
+        except (TypeError, ValueError):
+            pass
+        zodiac = s.value("show_zodiac", True)
+        # QSettings stores bools as strings on some platforms
+        if isinstance(zodiac, str):
+            zodiac = zodiac.lower() not in ("false", "0", "")
+        self.btn_zodiac.setChecked(bool(zodiac))
+        even = s.value("even_mode", False)
+        if isinstance(even, str):
+            even = even.lower() not in ("false", "0", "")
+        self.btn_even.setChecked(bool(even))
+        # Language
+        lang = s.value("language", "en")
+        if lang in STRINGS:
+            self._lang = lang
+            self._apply_language()
+        # Zodiac font scale
+        try:
+            zfs = int(s.value("zodiac_font_scale", 100))
+            self._zodiac_font_scale = zfs / 100.0
+            self.canvas.set_zodiac_font_scale(self._zodiac_font_scale)
+        except (TypeError, ValueError):
+            pass
+        # Show marks
+        show_marks = s.value("show_marks", True)
+        if isinstance(show_marks, str):
+            show_marks = show_marks.lower() not in ("false", "0", "")
+        self.btn_marks.setChecked(bool(show_marks))
+        # Planet scale
+        try:
+            ps = int(s.value("planet_scale", 100))
+            self.planet_slider.setValue(ps)
+        except (TypeError, ValueError):
+            pass
+        try:
+            raw_min = s.value("slider_min", None)
+            raw_max = s.value("slider_max", None)
+            if raw_min and raw_max:
+                new_min = date.fromisoformat(raw_min)
+                new_max = date.fromisoformat(raw_max)
+                if new_max > new_min:
+                    self._set_slider_range(new_min, new_max)
+        except (TypeError, ValueError):
+            pass
+        # Min aligned planets
+        try:
+            map_val = int(s.value("min_align_planets", 3))
+            if 3 <= map_val <= 8:
+                self._min_align_planets = map_val
+        except (TypeError, ValueError):
+            pass
+        # Compute alignment marks for initial range
+        self._recompute_alignments()
+
+    def closeEvent(self, event):
+        self._save_settings()
+        super().closeEvent(event)
+
+    def _open_calendar(self):
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Pick a Date")
+        dlg.setStyleSheet(self.styleSheet() + """
+            QCalendarWidget QAbstractItemView {
+                color: #c8d8f0; background: #0d1a30;
+                selection-background-color: #2a5a9a;
+            }
+            QCalendarWidget QWidget#qt_calendar_navigationbar {
+                background: #0d1a30;
+            }
+            QCalendarWidget QToolButton {
+                color: #90c0e8; background: #1a2a4a;
+                border: 1px solid #2a4a7a; border-radius: 4px;
+            }
+            QCalendarWidget QSpinBox {
+                color: #90c0e8; background: #1a2a4a;
+                border: 1px solid #2a4a7a;
+            }
+        """)
+        vbox = QVBoxLayout(dlg)
+        cal = QCalendarWidget()
+        cal.setMinimumDate(QDate(DATE_MIN.year, DATE_MIN.month, DATE_MIN.day))
+        cal.setMaximumDate(QDate(DATE_MAX.year, DATE_MAX.month, DATE_MAX.day))
+        # pre-select current simulation date
+        cd = self._current_date
+        cal.setSelectedDate(QDate(cd.year, cd.month, cd.day))
+        vbox.addWidget(cal)
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(dlg.accept)
+        btns.rejected.connect(dlg.reject)
+        vbox.addWidget(btns)
+        if dlg.exec() == QDialog.Accepted:
+            qd = cal.selectedDate()
+            self._set_current_date(date(qd.year(), qd.month(), qd.day()))
+
+
+# ---------------------------------------------------------------------------
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    app.setApplicationName("Solar System")
+    win = MainWindow()
+    win.show()
+    sys.exit(app.exec())
