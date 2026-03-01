@@ -25,14 +25,22 @@ from PySide6.QtWidgets import QStyle, QStyleOptionSlider
 J2000 = date(2000, 1, 1)
 
 PLANETS = [
-    dict(name="Mercury", period=87.969,   au=0.39, color=QColor(180, 180, 185), size=5,  mean_lon=252.25),
-    dict(name="Venus",   period=224.701,  au=0.72, color=QColor(240, 190,  80), size=7,  mean_lon=181.98),
-    dict(name="Earth",   period=365.256,  au=1.00, color=QColor( 60, 140, 220), size=8,  mean_lon=100.46),
-    dict(name="Mars",    period=686.971,  au=1.52, color=QColor(200,  70,  50), size=6,  mean_lon=355.45),
-    dict(name="Jupiter", period=4332.59,  au=5.20, color=QColor(210, 145, 100), size=16, mean_lon= 34.40),
-    dict(name="Saturn",  period=10759.2,  au=9.58, color=QColor(210, 178, 110), size=13, mean_lon= 49.94),
-    dict(name="Uranus",  period=30688.5,  au=19.2, color=QColor(130, 210, 230), size=11, mean_lon=313.23),
-    dict(name="Neptune", period=60182.0,  au=30.1, color=QColor( 60,  80, 200), size=10, mean_lon=304.88),
+    dict(name="Mercury", period=87.969,   au=0.39, color=QColor(180, 180, 185), size=5,  mean_lon=252.25,
+         spin_days=58.646,   radius_km=2440,   orbital_speed_km_s=47.4),
+    dict(name="Venus",   period=224.701,  au=0.72, color=QColor(240, 190,  80), size=7,  mean_lon=181.98,
+         spin_days=-243.025, radius_km=6052,   orbital_speed_km_s=35.0),
+    dict(name="Earth",   period=365.256,  au=1.00, color=QColor( 60, 140, 220), size=8,  mean_lon=100.46,
+         spin_days=0.9973,   radius_km=6371,   orbital_speed_km_s=29.8),
+    dict(name="Mars",    period=686.971,  au=1.52, color=QColor(200,  70,  50), size=6,  mean_lon=355.45,
+         spin_days=1.026,    radius_km=3390,   orbital_speed_km_s=24.1),
+    dict(name="Jupiter", period=4332.59,  au=5.20, color=QColor(210, 145, 100), size=16, mean_lon= 34.40,
+         spin_days=0.4135,   radius_km=69911,  orbital_speed_km_s=13.1),
+    dict(name="Saturn",  period=10759.2,  au=9.58, color=QColor(210, 178, 110), size=13, mean_lon= 49.94,
+         spin_days=0.4440,   radius_km=58232,  orbital_speed_km_s=9.7),
+    dict(name="Uranus",  period=30688.5,  au=19.2, color=QColor(130, 210, 230), size=11, mean_lon=313.23,
+         spin_days=-0.7183,  radius_km=25362,  orbital_speed_km_s=6.8),
+    dict(name="Neptune", period=60182.0,  au=30.1, color=QColor( 60,  80, 200), size=10, mean_lon=304.88,
+         spin_days=0.6713,   radius_km=24622,  orbital_speed_km_s=5.4),
 ]
 
 DATE_MIN = date(2000,  1,  1)
@@ -207,6 +215,40 @@ def days_since_j2000(d: date) -> float:
     return (d - J2000).days
 
 
+# Solar-term kinds: 0=cross-quarter, 1=equinox, 2=solstice
+_SOLAR_TERM_TARGETS = [
+    (0,   1), (45,  0), (90,  2), (135, 0),
+    (180, 1), (225, 0), (270, 2), (315, 0),
+]
+_ST_SYMBOLS = {
+    0: ("\u25c6", QColor(180, 120, 255, 220)),   # cross-quarter ◆ purple
+    1: ("\u2295", QColor( 80, 210, 160, 220)),   # equinox  ⊕ green
+    2: ("\u2600", QColor(255, 210,  60, 220)),   # solstice ☀ yellow
+}
+
+
+def compute_solar_terms(d_min: date, d_max: date) -> list:
+    """Return (float_day_offset, kind) for the 8 solar terms in the date range.
+    The fractional part of the offset encodes the sub-day time (hours/minutes)."""
+    earth = next(p for p in PLANETS if p["name"] == "Earth")
+    results = []
+    total = (d_max - d_min).days
+    prev = None
+    for i in range(total + 2):
+        d = d_min + timedelta(days=i)
+        lon = (planet_angle_deg(earth, d) + 180.0) % 360.0
+        if prev is not None:
+            step = (lon - prev) % 360.0
+            if 0 < step < 5:           # sane forward step
+                for target, kind in _SOLAR_TERM_TARGETS:
+                    gap = (target - prev) % 360.0
+                    if gap < step:
+                        frac = gap / step if step > 0 else 0.0
+                        results.append((max(0.0, i - 1 + frac), kind))
+        prev = lon
+    return results
+
+
 def planet_angle_deg(planet: dict, d: date) -> float:
     days = days_since_j2000(d)
     return (planet["mean_lon"] + 360.0 * days / planet["period"]) % 360.0
@@ -218,11 +260,39 @@ def _lon_diff(a: float, b: float) -> float:
     return d - 360.0 if d > 180.0 else d
 
 
+def compute_moon_phase_angle(d: date) -> float:
+    """Return geocentric Moon phase angle in degrees.
+    0° = New Moon, 90° = First Quarter, 180° = Full Moon, 270° = Last Quarter."""
+    days = days_since_j2000(d)
+    moon = MOONS["Earth"][0]
+    moon_lon = (moon["mean_lon"] + 360.0 * days / moon["period"]) % 360.0
+    earth = next(p for p in PLANETS if p["name"] == "Earth")
+    earth_lon = planet_angle_deg(earth, d)
+    # Geocentric direction to the Sun
+    sun_geo = (earth_lon + 180.0) % 360.0
+    return (moon_lon - sun_geo) % 360.0
+
+
+MOON_PHASE_SYMBOLS = ["\U0001f311","\U0001f312","\U0001f313","\U0001f314",
+                       "\U0001f315","\U0001f316","\U0001f317","\U0001f318"]
+MOON_PHASE_NAMES_EN = ["New Moon","Waxing Crescent","First Quarter","Waxing Gibbous",
+                        "Full Moon","Waning Gibbous","Last Quarter","Waning Crescent"]
+
+
+def moon_phase_info(d: date) -> tuple:
+    """Return (symbol, name, illumination_pct) for the given date."""
+    angle = compute_moon_phase_angle(d)
+    idx = int((angle + 22.5) / 45.0) % 8
+    illum = round((1 - math.cos(math.radians(angle))) / 2 * 100)
+    return MOON_PHASE_SYMBOLS[idx], MOON_PHASE_NAMES_EN[idx], illum
+
+
 # ---------------------------------------------------------------------------
 # Solar-system canvas
 # ---------------------------------------------------------------------------
 class SolarSystemWidget(QWidget):
     AU_SCALE = 22          # pixels per AU at default zoom
+    planetSelected = Signal(str)   # emits planet name, or "" when deselected
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -236,6 +306,13 @@ class SolarSystemWidget(QWidget):
         self.geo_mode = False
         self.show_zodiac_sectors = False
         self.show_trail = False
+        # --- new state ---
+        self.selected_planet: str | None = None   # name of selected planet
+        self.show_info_panel = False
+        self._planet_screen_pos: dict = {}        # name -> (sx, sy, r)
+        self.trail_date_min: date = DATE_MIN
+        self.trail_date_max: date = DATE_MAX
+        self._time_suffix: str = ""    # optional HH:MM appended to date label on solar terms
         self.setMinimumSize(900, 900)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setStyleSheet("background-color: #06060f;")
@@ -280,6 +357,44 @@ class SolarSystemWidget(QWidget):
         self.show_zodiac_sectors = enabled
         self.update()
 
+    def set_trail_range(self, d_min: date, d_max: date):
+        self.trail_date_min = d_min
+        self.trail_date_max = d_max
+        self.update()
+
+    def set_time_suffix(self, s: str):
+        """Set an optional time string (e.g. '14:32') appended to the date label."""
+        self._time_suffix = s
+        self.update()
+
+    def set_selected_planet(self, name: str | None):
+        self.selected_planet = name or None
+        self.update()
+
+    def set_show_info_panel(self, visible: bool):
+        self.show_info_panel = visible
+        self.update()
+
+    # ------------------------------------------------------------------
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            pos = event.position() if hasattr(event, 'position') else event.pos()
+            mx, my = pos.x(), pos.y()
+            best, best_dist = None, float('inf')
+            for name, (sx, sy, sr) in self._planet_screen_pos.items():
+                dist = math.hypot(mx - sx, my - sy)
+                hit_r = max(sr * 2.2, 14)
+                if dist <= hit_r and dist < best_dist:
+                    best_dist = dist
+                    best = name
+            # Toggle off if clicking the already-selected planet
+            new_sel = None if best == self.selected_planet else best
+            if new_sel != self.selected_planet:
+                self.selected_planet = new_sel
+                self.planetSelected.emit(new_sel or "")
+                self.update()
+        super().mousePressEvent(event)
+
     # ------------------------------------------------------------------
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -322,9 +437,10 @@ class SolarSystemWidget(QWidget):
 
         # Translate for planets: geocentric (Earth at centre) or heliocentric (Sun)
         if self.geo_mode:
-            painter.translate(cx - earth_hx, cy - earth_hy)
+            _tx, _ty = cx - earth_hx, cy - earth_hy
         else:
-            painter.translate(cx, cy)
+            _tx, _ty = cx, cy
+        painter.translate(_tx, _ty)
 
         # Geocentric trails (drawn first so they sit behind planets)
         if self.show_trail and self.geo_mode:
@@ -334,24 +450,33 @@ class SolarSystemWidget(QWidget):
         self._draw_sun(painter, scale, even_step)
 
         # Orbits + planets
+        self._planet_screen_pos.clear()
         for idx, planet in enumerate(PLANETS):
             if self.even_mode:
                 orbit_r = even_step * (idx + 1)
             else:
                 orbit_r = planet["au"] * scale
-            # Heliocentric circular orbits are only meaningful in heliocentric view
+            # In helio mode show orbit ring; when a planet is selected show only its orbit
             if not self.geo_mode:
-                self._draw_orbit(painter, orbit_r)
+                if self.selected_planet is None or planet["name"] == self.selected_planet:
+                    self._draw_orbit(painter, orbit_r)
 
             angle_rad = math.radians(planet_angle_deg(planet, self.current_date))
             px = orbit_r * math.cos(angle_rad)
             py = -orbit_r * math.sin(angle_rad)
 
+            # Track screen position for mouse hit-testing
+            pr = planet["size"] / 2.0 * self.planet_scale
+            self._planet_screen_pos[planet["name"]] = (_tx + px, _ty + py, pr)
+
             self._draw_planet(painter, planet, px, py, scale)
 
-        # Date label (painted in widget coordinates, so undo translate)
+        # Date label + overlays (undo translate first)
         painter.resetTransform()
         self._draw_date_label(painter, w, h)
+        self._draw_moon_phase_overlay(painter, w, h)
+        if self.show_info_panel and self.selected_planet:
+            self._draw_info_panel(painter, w, h)
 
         painter.end()
 
@@ -368,8 +493,18 @@ class SolarSystemWidget(QWidget):
         # Real-AU Earth radius (needed for retrograde lon detection always)
         r_au_e = earth_planet["au"] * scale
 
+        # No trails at all when no planet is selected
+        if not self.selected_planet:
+            return
+
+        # Clamp sampling window to the timeline slider range
+        range_lo = (self.trail_date_min - DATE_MIN).days
+        range_hi = (self.trail_date_max - DATE_MIN).days
+
         for planet in PLANETS:
             if planet["name"] == "Earth":
+                continue
+            if planet["name"] != self.selected_planet:
                 continue
 
             p_idx = PLANETS.index(planet)
@@ -384,8 +519,8 @@ class SolarSystemWidget(QWidget):
             pts = []    # (tx, ty, day_abs)
             lons = []   # geocentric ecliptic longitude at each sample
 
-            lo = max(0, cur_abs - HALF)
-            hi = min(TOTAL_DAYS, cur_abs + HALF)
+            lo = max(range_lo, cur_abs - HALF)
+            hi = min(range_hi, cur_abs + HALF)
             # Snap lo to the STEP grid so sample positions are frame-stable
             lo = (lo // STEP) * STEP
 
@@ -612,6 +747,14 @@ class SolarSystemWidget(QWidget):
         color: QColor = planet["color"]
         r = planet["size"] / 2.0 * self.planet_scale
 
+        # Selection highlight ring
+        if self.selected_planet == planet["name"]:
+            ring_pen = QPen(QColor(255, 255, 120, 200))
+            ring_pen.setWidthF(2.0)
+            painter.setPen(ring_pen)
+            painter.setBrush(Qt.NoBrush)
+            painter.drawEllipse(QPointF(px, py), r + 5, r + 5)
+
         # Planet glow
         glow_r = r * 2.5
         grad = QRadialGradient(QPointF(px, py), glow_r)
@@ -652,21 +795,26 @@ class SolarSystemWidget(QWidget):
         planet_r = planet["size"] / 2.0
         days = days_since_j2000(self.current_date)
 
+        # In geocentric mode Earth's Moon gets a larger radius + bigger disk
+        geo_earth = self.geo_mode and planet["name"] == "Earth"
+        moon_orbit_mult = 2.2 if geo_earth else 1.0
+        moon_size_mult  = 3.5 if geo_earth else 1.0
+
         if self.even_mode:
             # Visual spacing: proportional to dist_fac
             for moon in p_moons:
-                orbit_r = planet_r * moon["dist_fac"]
-                self._draw_single_moon(painter, moon, px, py, orbit_r, days)
+                orbit_r = planet_r * moon["dist_fac"] * moon_orbit_mult
+                self._draw_single_moon(painter, moon, px, py, orbit_r, days, moon_size_mult)
         else:
             # Real-proportions mode: scale so outermost moon sits at planet_r * 6,
             # others proportional by actual AU. Minimum planet_r * 2 so tiny inner
             # moons (Phobos etc.) stay visible.
             max_au = max(m["au"] for m in p_moons)
             for moon in p_moons:
-                orbit_r = max(planet_r * 2.0, planet_r * 6.0 * moon["au"] / max_au)
-                self._draw_single_moon(painter, moon, px, py, orbit_r, days)
+                orbit_r = max(planet_r * 2.0, planet_r * 6.0 * moon["au"] / max_au) * moon_orbit_mult
+                self._draw_single_moon(painter, moon, px, py, orbit_r, days, moon_size_mult)
 
-    def _draw_single_moon(self, painter, moon, px, py, orbit_r, days):
+    def _draw_single_moon(self, painter, moon, px, py, orbit_r, days, size_mult=1.0):
         # faint orbit ring
         pen = QPen(QColor(255, 255, 255, 20))
         pen.setWidth(1)
@@ -677,7 +825,7 @@ class SolarSystemWidget(QWidget):
         ang = math.radians((moon["mean_lon"] + 360.0 * days / moon["period"]) % 360.0)
         mx = px + orbit_r * math.cos(ang)
         my = py - orbit_r * math.sin(ang)
-        mr = moon["size"] / 2.0
+        mr = moon["size"] / 2.0 * size_mult
         # glow
         ggrad = QRadialGradient(QPointF(mx, my), mr * 2.2)
         gc = QColor(moon["color"]); gc.setAlpha(50)
@@ -701,10 +849,208 @@ class SolarSystemWidget(QWidget):
 
     def _draw_date_label(self, painter, w, h):
         text = self.current_date.strftime("%B %d, %Y")
+        if self._time_suffix:
+            text += f"  {self._time_suffix}"
         font = QFont("Segoe UI", 13, QFont.Bold)
         painter.setFont(font)
         painter.setPen(QPen(QColor(200, 220, 255, 210)))
         painter.drawText(QRectF(10, h - 34, w - 20, 28), Qt.AlignLeft, text)
+
+    # ------------------------------------------------------------------
+    def _draw_moon_phase_overlay(self, painter, w, h):
+        """Draw a large moon phase display in the top-left corner."""
+        sym, name, illum = moon_phase_info(self.current_date)
+        angle = compute_moon_phase_angle(self.current_date)
+
+        pad    = 12
+        disk_r = 34
+        box_w  = 170
+        box_h  = disk_r * 2 + 52
+        bx, by = pad, pad
+
+        # Panel background
+        painter.setBrush(QBrush(QColor(8, 15, 38, 200)))
+        painter.setPen(QPen(QColor(100, 140, 200, 120), 1.0))
+        painter.drawRoundedRect(QRectF(bx, by, box_w, box_h), 8, 8)
+
+        # Moon disk centre
+        mcx = bx + disk_r + pad
+        mcy = by + disk_r + pad
+
+        # Dark base
+        painter.setBrush(QBrush(QColor(30, 32, 45)))
+        painter.setPen(Qt.NoPen)
+        painter.drawEllipse(QPointF(mcx, mcy), disk_r, disk_r)
+
+        # ──────────────────────────────────────────────────────────────
+        # Lit-region path using a two-cubic Bezier terminator.
+        # Convention (Northern-hemisphere view, top = north):
+        #   angle   0 = New Moon       (right lit side zero)
+        #   angle  90 = First Quarter  (right half lit)
+        #   angle 180 = Full Moon
+        #   angle 270 = Last Quarter   (left half lit)
+        #
+        # The terminator is a half-ellipse with:
+        #   horizontal semi-axis = cos(angle) * disk_r   (signed)
+        #   vertical   semi-axis = disk_r
+        # For waxing (0-180) the outer limb is the RIGHT semicircle.
+        # For waning (180-360) the outer limb is the LEFT semicircle,
+        # and we negate cos so the terminator moves the correct direction.
+        # ──────────────────────────────────────────────────────────────
+        disk_rect = QRectF(mcx - disk_r, mcy - disk_r, disk_r * 2, disk_r * 2)
+        disk_full = QPainterPath()
+        disk_full.addEllipse(QPointF(mcx, mcy), disk_r, disk_r)
+
+        K = 0.5523   # Bezier circle approximation constant
+        phase_rad = math.radians(angle)
+        lit = QPainterPath()
+
+        if angle < 0.5 or angle > 359.5:
+            pass   # New Moon: nothing lit
+        elif abs(angle - 180.0) < 0.5:
+            lit.addEllipse(QPointF(mcx, mcy), disk_r, disk_r)   # Full Moon
+        elif angle < 180.0:   # Waxing
+            tx = math.cos(phase_rad) * disk_r   # +disk_r (crescent) → -disk_r (gibbous)
+            lit.moveTo(mcx, mcy - disk_r)                 # TOP
+            lit.arcTo(disk_rect, 90, -180)                # right limb CW → BOTTOM
+            # Bezier terminator: BOTTOM → mid → TOP
+            lit.cubicTo(mcx + K * tx,  mcy + disk_r,
+                        mcx + tx,      mcy + K * disk_r,
+                        mcx + tx,      mcy)
+            lit.cubicTo(mcx + tx,      mcy - K * disk_r,
+                        mcx + K * tx,  mcy - disk_r,
+                        mcx,           mcy - disk_r)
+            lit.closeSubpath()
+        else:              # Waning (180 < angle < 360)
+            tx = -math.cos(phase_rad) * disk_r  # moves right as angle → 360
+            lit.moveTo(mcx, mcy - disk_r)                 # TOP
+            lit.arcTo(disk_rect, 90, 180)                 # left limb CCW → BOTTOM
+            # Bezier terminator: BOTTOM → mid → TOP
+            lit.cubicTo(mcx + K * tx,  mcy + disk_r,
+                        mcx + tx,      mcy + K * disk_r,
+                        mcx + tx,      mcy)
+            lit.cubicTo(mcx + tx,      mcy - K * disk_r,
+                        mcx + K * tx,  mcy - disk_r,
+                        mcx,           mcy - disk_r)
+            lit.closeSubpath()
+
+        final_path = lit.intersected(disk_full)
+        moon_grad = QRadialGradient(QPointF(mcx - disk_r * 0.25, mcy - disk_r * 0.25), disk_r * 1.3)
+        moon_grad.setColorAt(0.0, QColor(240, 240, 220))
+        moon_grad.setColorAt(1.0, QColor(180, 180, 160))
+        painter.setBrush(QBrush(moon_grad))
+        painter.setPen(Qt.NoPen)
+        painter.drawPath(final_path)
+
+        # Rim
+        painter.setBrush(Qt.NoBrush)
+        painter.setPen(QPen(QColor(180, 180, 160, 80), 0.8))
+        painter.drawEllipse(QPointF(mcx, mcy), disk_r, disk_r)
+
+        # Phase name
+        name_font = QFont("Segoe UI", 10, QFont.Bold)
+        painter.setFont(name_font)
+        painter.setPen(QPen(QColor(210, 230, 255, 230)))
+        tx = bx + disk_r * 2 + pad * 2
+        tw = box_w - disk_r * 2 - pad * 3
+        painter.drawText(QRectF(tx, by + pad, tw, 20),
+                         Qt.AlignLeft | Qt.AlignVCenter, name)
+        # Illumination %
+        pct_font = QFont("Segoe UI", 9)
+        painter.setFont(pct_font)
+        painter.setPen(QPen(QColor(150, 190, 240, 200)))
+        painter.drawText(QRectF(tx, by + pad + 22, tw, 18),
+                         Qt.AlignLeft | Qt.AlignVCenter, f"Illuminated: {illum}%")
+        # Small bar
+        bar_y = by + pad + 44
+        bar_x = tx
+        bar_w = min(tw, 80)
+        bar_h2 = 6
+        painter.setBrush(QBrush(QColor(30, 40, 70)))
+        painter.setPen(Qt.NoPen)
+        painter.drawRoundedRect(QRectF(bar_x, bar_y, bar_w, bar_h2), 3, 3)
+        painter.setBrush(QBrush(QColor(200, 220, 255, 200)))
+        painter.drawRoundedRect(QRectF(bar_x, bar_y, bar_w * illum / 100, bar_h2), 3, 3)
+
+    def _draw_info_panel(self, painter, w, h):
+        """Overlay panel on the left side showing selected planet data."""
+        planet = next((p for p in PLANETS if p["name"] == self.selected_planet), None)
+        if planet is None:
+            return
+
+        # Compute distance to Earth
+        earth_data = next(p for p in PLANETS if p["name"] == "Earth")
+        if planet["name"] == "Earth":
+            dist_str = "—"
+        else:
+            ang_e = math.radians(planet_angle_deg(earth_data, self.current_date))
+            ang_p = math.radians(planet_angle_deg(planet, self.current_date))
+            ex = earth_data["au"] * math.cos(ang_e)
+            ey = earth_data["au"] * math.sin(ang_e)
+            px2 = planet["au"] * math.cos(ang_p)
+            py2 = planet["au"] * math.sin(ang_p)
+            dist_au = math.hypot(px2 - ex, py2 - ey)
+            dist_km = dist_au * 149_597_870.7
+            if dist_km >= 1_000_000:
+                dist_str = f"{dist_km / 1_000_000:.2f} M km"
+            else:
+                dist_str = f"{dist_km:,.0f} km"
+
+        pad    = 14
+        line_h = 26
+        title_h = 30
+        lines = [
+            ("Orbital period",  f"{planet['period']:.1f} days"),
+            ("Radius",          f"{planet['radius_km']:,} km"),
+            ("Orbital speed",   f"{planet['orbital_speed_km_s']:.1f} km/s"),
+            ("Rotation period", (
+                f"{abs(planet['spin_days']):.3f} d (retro)"
+                if planet['spin_days'] < 0
+                else f"{planet['spin_days']:.3f} d")),
+            ("Distance (Sun)",  f"{planet['au']:.2f} AU"),
+            ("Distance (Earth)", dist_str),
+        ]
+
+        panel_w = 268
+        panel_h = pad * 2 + title_h + len(lines) * line_h + 4
+        # Position below moon-phase box (top-left) with a gap
+        moon_box_bottom = 12 + 34 * 2 + 52 + 8   # by(12) + box_h(120) + gap(8)
+        px0 = 12
+        py0 = moon_box_bottom
+
+        # Background
+        bg = QColor(10, 18, 40, 215)
+        border = QColor(planet["color"].red(), planet["color"].green(), planet["color"].blue(), 180)
+        painter.setBrush(QBrush(bg))
+        painter.setPen(QPen(border, 1.5))
+        painter.drawRoundedRect(QRectF(px0, py0, panel_w, panel_h), 8, 8)
+
+        # Title
+        title_font = QFont("Segoe UI", 14, QFont.Bold)
+        painter.setFont(title_font)
+        painter.setPen(QPen(planet["color"].lighter(180)))
+        painter.drawText(QRectF(px0 + pad, py0 + pad - 2, panel_w - pad * 2, title_h),
+                         Qt.AlignLeft | Qt.AlignVCenter, planet["name"])
+
+        # Separator line
+        sep_y = py0 + pad + title_h
+        painter.setPen(QPen(QColor(border.red(), border.green(), border.blue(), 80), 1.0))
+        painter.drawLine(QPointF(px0 + pad, sep_y), QPointF(px0 + panel_w - pad, sep_y))
+
+        # Data rows
+        lbl_font = QFont("Segoe UI", 10)
+        val_font = QFont("Segoe UI", 10, QFont.Bold)
+        lbl_w = 118
+        for i, (lbl, val) in enumerate(lines):
+            row_y = sep_y + 4 + i * line_h
+            painter.setFont(lbl_font)
+            painter.setPen(QPen(QColor(140, 170, 210, 210)))
+            painter.drawText(QRectF(px0 + pad, row_y, lbl_w, line_h),
+                             Qt.AlignLeft | Qt.AlignVCenter, lbl + ":")
+            painter.setFont(val_font)
+            painter.setPen(QPen(QColor(220, 235, 255, 240)))
+            painter.drawText(QRectF(px0 + pad + lbl_w, row_y, panel_w - pad * 2 - lbl_w, line_h),
+                             Qt.AlignLeft | Qt.AlignVCenter, val)
 
 
 # ---------------------------------------------------------------------------
@@ -721,6 +1067,10 @@ class _ClickableLabel(QLabel):
 # ---------------------------------------------------------------------------
 # Slider subclass: double-click signal + alignment mark painting
 # ---------------------------------------------------------------------------
+_MONTH_ABBR = ["Jan","Feb","Mar","Apr","May","Jun",
+               "Jul","Aug","Sep","Oct","Nov","Dec"]
+
+
 class _RangeSlider(QSlider):
     doubleClicked = Signal()
 
@@ -728,14 +1078,23 @@ class _RangeSlider(QSlider):
         super().__init__(*args, **kwargs)
         self._marks: list = []
         self._show_marks: bool = True
+        self._date_min: "date | None" = None
+        self._solar_terms: list = []   # list of (offset, kind)
 
     def set_marks(self, marks: list):
-        # marks is a list of (offset, count) tuples
         self._marks = marks
         self.update()
 
     def set_show_marks(self, visible: bool):
         self._show_marks = visible
+        self.update()
+
+    def set_date_range(self, d_min: "date"):
+        self._date_min = d_min
+        self.update()
+
+    def set_solar_terms(self, terms: list):
+        self._solar_terms = terms
         self.update()
 
     def mouseDoubleClickEvent(self, event):
@@ -744,8 +1103,6 @@ class _RangeSlider(QSlider):
 
     def paintEvent(self, event):
         super().paintEvent(event)
-        if not self._marks or not self._show_marks:
-            return
         total = self.maximum() - self.minimum()
         if total <= 0:
             return
@@ -758,14 +1115,74 @@ class _RangeSlider(QSlider):
         gy = groove.center().y()
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
-        pen = QPen()
-        pen.setWidthF(1.5)
-        for offset, cnt in self._marks:
-            frac = (offset - self.minimum()) / total
-            x = int(gx + frac * gw)
-            pen.setColor(_mark_color(cnt))
-            painter.setPen(pen)
-            painter.drawLine(x, gy - 6, x, gy + 6)
+
+        # ── Year / month tick marks with labels ──────────────────────
+        if self._date_min is not None:
+            from datetime import date as _date
+            d_min = self._date_min
+            d_max = d_min + timedelta(days=total)
+            n_months = (d_max.year - d_min.year) * 12 + d_max.month - d_min.month
+            # Decide label density: every month, every quarter, or every year
+            show_all_months  = n_months <= 48
+            show_qtr_months  = n_months <= 120
+            yr_font  = QFont("Segoe UI", 7, QFont.Bold)
+            mo_font  = QFont("Segoe UI", 6)
+            yr, mo = d_min.year, 1
+            while True:
+                tick_d = _date(yr, mo, 1)
+                if tick_d > d_max:
+                    break
+                if tick_d >= d_min:
+                    offset = (tick_d - d_min).days
+                    x = int(gx + offset / total * gw)
+                    if mo == 1:
+                        # Tall year tick + year label above
+                        painter.setPen(QPen(QColor(160, 200, 255, 200), 1.2))
+                        painter.drawLine(x, gy - 10, x, gy + 10)
+                        painter.setFont(yr_font)
+                        painter.setPen(QPen(QColor(160, 200, 255, 220)))
+                        painter.drawText(x - 14, gy - 12, str(yr))
+                    else:
+                        # Month tick
+                        show_lbl = show_all_months or (show_qtr_months and mo in (4, 7, 10))
+                        painter.setPen(QPen(QColor(100, 140, 200, 130), 0.8))
+                        painter.drawLine(x, gy - 5, x, gy + 5)
+                        if show_lbl:
+                            painter.setFont(mo_font)
+                            painter.setPen(QPen(QColor(120, 160, 210, 180)))
+                            lbl = _MONTH_ABBR[mo - 1]
+                            painter.drawText(x - 8, gy + 16, lbl)
+                mo += 1
+                if mo > 12:
+                    mo = 1
+                    yr += 1
+
+        # ── Solar-term ticks ──────────────────────────────────────────
+        if self._solar_terms:
+            st_font = QFont("Segoe UI Symbol", 6)
+            painter.setFont(st_font)
+            for offset, kind in self._solar_terms:
+                frac = offset / total
+                if not (0 <= frac <= 1):
+                    continue
+                x = int(gx + frac * gw)
+                sym, col = _ST_SYMBOLS[kind]
+                tick_h = 8 if kind == 0 else 11
+                painter.setPen(QPen(col, 1.2))
+                painter.drawLine(x, gy - tick_h, x, gy + tick_h)
+                painter.setPen(QPen(col))
+                painter.drawText(x - 4, gy - tick_h - 1, sym)
+
+        # ── Alignment marks ───────────────────────────────────────────
+        if self._marks and self._show_marks:
+            pen = QPen()
+            pen.setWidthF(1.5)
+            for offset, cnt in self._marks:
+                frac = (offset - self.minimum()) / total
+                x = int(gx + frac * gw)
+                pen.setColor(_mark_color(cnt))
+                painter.setPen(pen)
+                painter.drawLine(x, gy - 6, x, gy + 6)
         painter.end()
 
 
@@ -813,6 +1230,8 @@ class MainWindow(QMainWindow):
         self._zodiac_font_scale = 1.0
         self._alignment_marks: list = []
         self._min_align_planets: int = 3
+        self._solar_term_data: list = []      # list of (float_offset, kind)
+        self._current_float_offset: float = 0.0
 
         self._build_ui()
         self._set_current_date(date.today())
@@ -851,6 +1270,7 @@ class MainWindow(QMainWindow):
 
         # ── Canvas ──────────────────────────────────────────────────────
         self.canvas = SolarSystemWidget()
+        self.canvas.set_trail_range(self._slider_min, self._slider_max)
         root.addWidget(self.canvas, stretch=1)
 
         # ── Slider row ──────────────────────────────────────────────────
@@ -866,9 +1286,20 @@ class MainWindow(QMainWindow):
 
         self.slider = _RangeSlider(Qt.Horizontal)
         self.slider.setRange(0, (self._slider_max - self._slider_min).days)
+        self.slider.set_date_range(self._slider_min)
+        self._solar_term_data = compute_solar_terms(self._slider_min, self._slider_max)
+        self.slider.set_solar_terms(self._solar_term_data)
+        self.slider.setFixedHeight(42)
         self.slider.valueChanged.connect(self._slider_moved)
         self.slider.setToolTip("Drag to change date")
+
+        btn_prev_st = self._icon_btn("\u2190", "Jump to previous solar term (equinox / solstice)", w=26)
+        btn_prev_st.clicked.connect(self._jump_prev_solar_term)
+        slider_row.addWidget(btn_prev_st)
         slider_row.addWidget(self.slider, stretch=1)
+        btn_next_st = self._icon_btn("\u2192", "Jump to next solar term (equinox / solstice)", w=26)
+        btn_next_st.clicked.connect(self._jump_next_solar_term)
+        slider_row.addWidget(btn_next_st)
 
         self.lbl_max = _ClickableLabel(self._slider_max.strftime("%Y-%m-%d"))
         self.lbl_max.setFixedWidth(82)
@@ -951,6 +1382,11 @@ class MainWindow(QMainWindow):
         self.btn_trail.toggled.connect(self._toggle_trail)
         toolbar.addWidget(self.btn_trail)
 
+        # Planet info panel toggle  (ⓘ = circled i)
+        self.btn_info = self._icon_btn("\u24d8", "Show info panel for selected planet", w=34, checkable=True)
+        self.btn_info.toggled.connect(self._toggle_info_panel)
+        toolbar.addWidget(self.btn_info)
+
         toolbar.addSpacing(8)
 
         # Alignment nav
@@ -996,20 +1432,72 @@ class MainWindow(QMainWindow):
         toolbar.addStretch()
         root.addLayout(toolbar)
 
+        # Connect planet selection signal
+        self.canvas.planetSelected.connect(self._on_planet_selected)
+
     # ------------------------------------------------------------------
     def _set_current_date(self, d: date):
         d = max(self._slider_min, min(self._slider_max, d))
         self._current_date = d
         days_offset = (d - self._slider_min).days
+        self._current_float_offset = float(days_offset)
         self.slider.blockSignals(True)
         self.slider.setValue(days_offset)
         self.slider.blockSignals(False)
+        self.canvas.set_time_suffix("")
         self.canvas.set_date(d)
+        self._update_moon_phase_btn(d)
 
     def _slider_moved(self, value: int):
         d = self._slider_min + timedelta(days=value)
         self._current_date = d
+        self._current_float_offset = float(value)
+        self.canvas.set_time_suffix("")
         self.canvas.set_date(d)
+        self._update_moon_phase_btn(d)
+
+    def _update_moon_phase_btn(self, d: date):
+        pass  # Moon phase is now rendered directly on the canvas
+
+    def _on_planet_selected(self, name: str):
+        # Info panel shows automatically if btn_info is checked
+        pass  # canvas already updated via set_selected_planet via signal
+
+    # ── Solar-term navigation ──────────────────────────────────────────
+    def _jump_prev_solar_term(self):
+        cur = self._current_float_offset - 0.01
+        best = None
+        for offset, kind in self._solar_term_data:
+            if offset < cur and (best is None or offset > best[0]):
+                best = (offset, kind)
+        if best is not None:
+            self._go_to_solar_term(*best)
+
+    def _jump_next_solar_term(self):
+        cur = self._current_float_offset + 0.01
+        best = None
+        for offset, kind in self._solar_term_data:
+            if offset > cur and (best is None or offset < best[0]):
+                best = (offset, kind)
+        if best is not None:
+            self._go_to_solar_term(*best)
+
+    def _go_to_solar_term(self, offset: float, kind: int):
+        """Move to a solar term given its float day-offset from slider_min."""
+        day = int(offset)
+        frac = offset - day
+        total_minutes = round(frac * 24 * 60)
+        hours, minutes = divmod(total_minutes, 60)
+        d = self._slider_min + timedelta(days=day)
+        self._current_float_offset = offset
+        self._current_date = d
+        self.slider.blockSignals(True)
+        self.slider.setValue(day)
+        self.slider.blockSignals(False)
+        sym_char = _ST_SYMBOLS[kind][0]
+        self.canvas.set_time_suffix(f"{sym_char} {hours:02d}:{minutes:02d}")
+        self.canvas.set_date(d)
+        self._update_moon_phase_btn(d)
 
     def _toggle_play(self):
         if self._animation_timer.isActive():
@@ -1037,11 +1525,15 @@ class MainWindow(QMainWindow):
         cur_offset = max(0, min(total, (self._current_date - new_min).days))
         self.slider.blockSignals(True)
         self.slider.setRange(0, total)
+        self.slider.set_date_range(new_min)
         self.slider.setValue(cur_offset)
         self.slider.blockSignals(False)
         self.lbl_min.setText(new_min.strftime("%Y-%m-%d"))
         self.lbl_max.setText(new_max.strftime("%Y-%m-%d"))
         self.canvas.set_date(new_min + timedelta(days=cur_offset))
+        self.canvas.set_trail_range(new_min, new_max)
+        self._solar_term_data = compute_solar_terms(new_min, new_max)
+        self.slider.set_solar_terms(self._solar_term_data)
         self._recompute_alignments()
 
     def _open_range_dialog(self, side: str = ""):
@@ -1244,6 +1736,10 @@ class MainWindow(QMainWindow):
         self.canvas.set_show_trail(checked)
         self._save_settings()
 
+    def _toggle_info_panel(self, checked: bool):
+        self.canvas.set_show_info_panel(checked)
+        self._save_settings()
+
     def _toggle_marks(self, checked: bool):
         self.slider.set_show_marks(checked)
         self._save_settings()
@@ -1282,6 +1778,7 @@ class MainWindow(QMainWindow):
         s.setValue("geo_mode",          self.btn_geo.isChecked())
         s.setValue("zodiac_sectors",    self.btn_sectors.isChecked())
         s.setValue("show_trail",        self.btn_trail.isChecked())
+        s.setValue("show_info_panel",   self.btn_info.isChecked())
         s.sync()
 
     def _load_settings(self):
@@ -1290,7 +1787,7 @@ class MainWindow(QMainWindow):
         # overwrite the INI with partially-default values before we finish loading.
         _blocked = [
             self.btn_zodiac, self.btn_even, self.btn_geo, self.btn_sectors,
-            self.btn_trail, self.btn_marks, self.zoom_slider, self.planet_slider,
+            self.btn_trail, self.btn_info, self.btn_marks, self.zoom_slider, self.planet_slider,
         ]
         for w in _blocked:
             w.blockSignals(True)
@@ -1308,12 +1805,15 @@ class MainWindow(QMainWindow):
             self.canvas.set_geo_mode(self.btn_geo.isChecked())
             self.canvas.set_show_zodiac_sectors(self.btn_sectors.isChecked())
             self.canvas.set_show_trail(self.btn_trail.isChecked())
+            self.canvas.set_show_info_panel(self.btn_info.isChecked())
             self.slider.set_show_marks(self.btn_marks.isChecked())
             # Zoom row visibility depends on even mode
             even_on = self.btn_even.isChecked()
             self._zoom_lbl_widget.setVisible(not even_on)
             self.zoom_slider.setVisible(not even_on)
             self.lbl_zoom.setVisible(not even_on)
+            # Refresh moon phase display with loaded date
+            self._update_moon_phase_btn(self._current_date)
             # One clean save so the file is up to date
             self._save_settings()
 
@@ -1388,6 +1888,11 @@ class MainWindow(QMainWindow):
         if isinstance(trail, str):
             trail = trail.lower() not in ("false", "0", "")
         self.btn_trail.setChecked(bool(trail))
+        # Info panel
+        info_panel = s.value("show_info_panel", False)
+        if isinstance(info_panel, str):
+            info_panel = info_panel.lower() not in ("false", "0", "")
+        self.btn_info.setChecked(bool(info_panel))
         # Compute alignment marks for initial range
         self._recompute_alignments()
 
