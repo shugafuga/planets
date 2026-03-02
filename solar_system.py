@@ -53,7 +53,7 @@ TOTAL_DAYS = (DATE_MAX - DATE_MIN).days
 # ---------------------------------------------------------------------------
 MOONS = {
     "Earth": [
-        dict(name="Moon",     period=27.322,  dist_fac= 8.0, au=0.002570, size=2.5, color=QColor(180,180,180), mean_lon=  0),
+        dict(name="Moon",     period=27.322,  dist_fac= 8.0, au=0.002570, size=2.5, color=QColor(180,180,180), mean_lon=218.316),
     ],
     "Mars": [
         dict(name="Phobos",   period= 0.319,  dist_fac= 5.0, au=0.000063, size=1.5, color=QColor(160,140,120), mean_lon=  0),
@@ -736,8 +736,8 @@ class SolarSystemWidget(QWidget):
         painter.drawEllipse(QPointF(0, 0), sun_r, sun_r)
 
     def _draw_orbit(self, painter, r):
-        pen = QPen(QColor(255, 255, 255, 30))
-        pen.setWidth(1)
+        pen = QPen(QColor(255, 255, 255, 40))
+        pen.setWidth(1 )
         pen.setStyle(Qt.DotLine)
         painter.setPen(pen)
         painter.setBrush(Qt.NoBrush)
@@ -795,10 +795,12 @@ class SolarSystemWidget(QWidget):
         planet_r = planet["size"] / 2.0
         days = days_since_j2000(self.current_date)
 
-        # In geocentric mode Earth's Moon gets a larger radius + bigger disk
-        geo_earth = self.geo_mode and planet["name"] == "Earth"
-        moon_orbit_mult = 2.2 if geo_earth else 1.0
-        moon_size_mult  = 3.5 if geo_earth else 1.0
+        # In geocentric mode Earth's Moon gets a larger radius + bigger disk;
+        # in solar-centric mode the Moon also gets a modest boost to stay visible.
+        geo_earth  = self.geo_mode and planet["name"] == "Earth"
+        solo_earth = (not self.geo_mode) and planet["name"] == "Earth"
+        moon_orbit_mult = 1.5 if geo_earth else (.7 if solo_earth else .7)
+        moon_size_mult  = 3.5 if geo_earth else (2.5 if solo_earth else 1.0)
 
         if self.even_mode:
             # Visual spacing: proportional to dist_fac
@@ -1726,6 +1728,8 @@ class MainWindow(QMainWindow):
 
     def _toggle_geo(self, checked: bool):
         self.canvas.set_geo_mode(checked)
+        self.btn_zodiac.setVisible(checked)
+        self.btn_sectors.setVisible(checked)
         self._save_settings()
 
     def _toggle_zodiac_sectors(self, checked: bool):
@@ -1803,6 +1807,8 @@ class MainWindow(QMainWindow):
             self.canvas.set_show_zodiac(self.btn_zodiac.isChecked())
             self.canvas.set_even_mode(self.btn_even.isChecked())
             self.canvas.set_geo_mode(self.btn_geo.isChecked())
+            self.btn_zodiac.setVisible(self.btn_geo.isChecked())
+            self.btn_sectors.setVisible(self.btn_geo.isChecked())
             self.canvas.set_show_zodiac_sectors(self.btn_sectors.isChecked())
             self.canvas.set_show_trail(self.btn_trail.isChecked())
             self.canvas.set_show_info_panel(self.btn_info.isChecked())
