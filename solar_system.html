@@ -1,0 +1,1420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Solar System Visualization</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:#06060f;color:#c8d8f0;font-family:'Segoe UI',Arial,sans-serif}
+#app{display:flex;flex-direction:column;height:100vh;padding:8px;gap:6px}
+
+/* Canvas */
+#canvasWrap{flex:1;position:relative;min-height:0}
+#cv{display:block;width:100%;height:100%;cursor:crosshair}
+
+/* Slider row */
+#sliderRow{display:flex;align-items:center;gap:6px;height:44px}
+#sliderRow label{color:#80a0c0;font-size:9pt;white-space:nowrap;cursor:pointer;user-select:none}
+#sliderRow label:hover{color:#a0c8f0}
+#sliderWrap{flex:1;position:relative;height:44px}
+#timeSlider{-webkit-appearance:none;appearance:none;width:100%;height:6px;background:#1a2a4a;border-radius:3px;outline:none;cursor:pointer;position:absolute;top:50%;transform:translateY(-50%)}
+#timeSlider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;background:#4a8ad0;border:1px solid #6aaaf0;cursor:pointer}
+#timeSlider::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#4a8ad0;border:1px solid #6aaaf0;cursor:pointer}
+#sliderCanvas{position:absolute;top:0;left:0;pointer-events:none}
+
+/* Toolbar */
+#toolbar{display:flex;align-items:center;gap:3px;flex-wrap:wrap;min-height:34px}
+.btn{background:#1a2a4a;color:#90c0e8;border:1px solid #2a4a7a;border-radius:6px;padding:2px 7px;font-size:11pt;cursor:pointer;height:30px;min-width:30px;font-family:'Segoe UI Symbol','Segoe UI Emoji',Arial,sans-serif;white-space:nowrap;transition:background .15s}
+.btn:hover{background:#253a60}
+.btn:active{background:#0e1a30}
+.btn.active{background:#1a4a2a;border-color:#2a8a4a;color:#60e880}
+.btn:disabled{opacity:.4;cursor:default}
+.lbl{color:#80a0c0;font-size:9pt;white-space:nowrap;padding:0 2px}
+.sep{width:1px;height:22px;background:#2a4a7a;margin:0 4px}
+input[type=range].inlineSlider{-webkit-appearance:none;appearance:none;height:6px;background:#1a2a4a;border-radius:3px;outline:none;cursor:pointer}
+input[type=range].inlineSlider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:14px;height:14px;border-radius:50%;background:#4a8ad0;border:1px solid #6aaaf0;cursor:pointer}
+input[type=range].inlineSlider::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:#4a8ad0;border:1px solid #6aaaf0;cursor:pointer}
+.valLbl{color:#a0c0e8;font-size:9pt;min-width:40px;text-align:left}
+
+/* Modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:100;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:#0d1a30;border:1px solid #2a4a7a;border-radius:10px;padding:20px;min-width:300px;max-width:400px;color:#c8d8f0}
+.modal h2{font-size:13pt;margin-bottom:14px;color:#a0c8f0}
+.modal label{display:block;font-size:9pt;color:#80a0c0;margin-bottom:4px}
+.modal input,.modal select{width:100%;background:#0a1528;border:1px solid #2a4a7a;border-radius:4px;color:#c8d8f0;padding:4px 6px;font-size:10pt;margin-bottom:10px}
+.modal .row{display:flex;gap:8px;margin-top:14px;justify-content:flex-end}
+.modal .btn{font-size:10pt}
+
+/* Tooltip */
+[title]{cursor:default}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="canvasWrap"><canvas id="cv"></canvas></div>
+
+  <!-- Time slider row -->
+  <div id="sliderRow">
+    <label id="lblMin" title="Click to set range start">2024-01-01</label>
+    <button class="btn" id="btnPrevST" title="Previous solstice/equinox" style="min-width:26px;padding:0 4px">←</button>
+    <div id="sliderWrap">
+      <canvas id="sliderCanvas"></canvas>
+      <input type="range" id="timeSlider" min="0" max="1825" value="0"/>
+    </div>
+    <button class="btn" id="btnNextST" title="Next solstice/equinox" style="min-width:26px;padding:0 4px">→</button>
+    <label id="lblMax" title="Click to set range end">2029-01-01</label>
+  </div>
+
+  <!-- Toolbar -->
+  <div id="toolbar">
+    <button class="btn" id="btnPlay" title="Play / Pause">▶</button>
+    <button class="btn" id="btnNow"  title="Jump to today">⦿</button>
+    <button class="btn" id="btnPick" title="Pick date">📅</button>
+    <button class="btn" id="btnSettings" title="Settings">⚙</button>
+    <div class="sep"></div>
+    <span class="lbl" id="lblZoomText">Zoom:</span>
+    <input type="range" class="inlineSlider" id="zoomSlider" min="100" max="2500" value="100" style="width:120px" title="Zoom"/>
+    <span class="valLbl" id="lblZoom">1.00×</span>
+    <div class="sep"></div>
+    <button class="btn" id="btnZodiac"   title="Toggle zodiac ring"    >♈</button>
+    <button class="btn active" id="btnEven"    title="Equal orbit spacing"  >≡</button>
+    <button class="btn" id="btnGeo"     title="Earth-centric view"    >♁</button>
+    <button class="btn" id="btnSectors" title="Zodiac sector wedges"  style="display:none">☸</button>
+    <button class="btn" id="btnTrail"   title="Geocentric trails"     >⇌</button>
+    <button class="btn" id="btnInfo"    title="Planet info panel"     >ⓘ</button>
+    <div class="sep"></div>
+    <span class="lbl">Align:</span>
+    <button class="btn" id="btnPrevAlign" title="Previous alignment" style="min-width:26px;padding:0 4px">◄</button>
+    <span class="valLbl" id="lblAlignCount" style="min-width:24px;text-align:center;font-size:9pt">0</span>
+    <button class="btn" id="btnNextAlign" title="Next alignment"     style="min-width:26px;padding:0 4px">►</button>
+    <button class="btn active" id="btnMarks" title="Toggle alignment marks">●</button>
+    <div class="sep"></div>
+    <span class="lbl" title="Planet size scale">⊕</span>
+    <input type="range" class="inlineSlider" id="planetSlider" min="25" max="400" value="100" style="width:90px" title="Planet size"/>
+    <span class="valLbl" id="lblPlanet">1.00×</span>
+  </div>
+</div>
+
+<!-- Settings modal -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <h2>⚙ Settings</h2>
+    <label>Language:</label>
+    <select id="settLang"><option value="en">English</option><option value="uk">Українська</option></select>
+    <label>Zodiac font size:</label>
+    <input type="range" class="inlineSlider" id="settZFont" min="50" max="200" value="100" style="width:100%"/>
+    <div style="color:#80a0c0;font-size:9pt;margin-top:-6px;margin-bottom:8px">
+      <span id="settZFontVal">100</span>%
+    </div>
+    <label>Min planets for alignment marks:</label>
+    <input type="number" id="settMinAlign" min="3" max="8" value="3" style="width:70px"/>
+    <label style="margin-top:6px">Slider start date: <span style="color:#5a9ad0;font-size:8pt">(YYYY-MM-DD)</span></label>
+    <input type="text" id="settDateMin" placeholder="2024-01-01" maxlength="10" autocomplete="off" spellcheck="false"/>
+    <label>Slider end date: <span style="color:#5a9ad0;font-size:8pt">(YYYY-MM-DD)</span></label>
+    <input type="text" id="settDateMax" placeholder="2029-01-01" maxlength="10" autocomplete="off" spellcheck="false"/>
+    <div id="settDateErr" style="color:#f07070;font-size:8pt;min-height:16px;margin-top:-6px"></div>
+    <div class="row">
+      <button class="btn" id="settCancel">Cancel</button>
+      <button class="btn" id="settOk">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- Date picker modal -->
+<div class="modal-overlay" id="calModal">
+  <div class="modal">
+    <h2>📅 Pick Date</h2>
+    <label>Date: <span style="color:#5a9ad0;font-size:8pt">(YYYY-MM-DD)</span></label>
+    <input type="text" id="calInput" style="width:100%" placeholder="2026-03-02" maxlength="10" autocomplete="off" spellcheck="false"/>
+    <div id="calErr" style="color:#f07070;font-size:8pt;min-height:14px"></div>
+    <div class="row">
+      <button class="btn" id="calCancel">Cancel</button>
+      <button class="btn" id="calOk">OK</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+// ─────────────────────────────────────────────────────────────────────────────
+// DATA
+// ─────────────────────────────────────────────────────────────────────────────
+const J2000 = new Date('2000-01-01T00:00:00Z');
+function daysSinceJ2000(d){
+  return Math.round((d - J2000)/86400000);
+}
+function dateFromOffset(baseDate, offset){
+  const d = new Date(baseDate.getTime());
+  d.setDate(d.getDate() + offset);
+  return d;
+}
+function dateToISO(d){
+  return d.toISOString().slice(0,10);
+}
+function isoToDate(s){
+  const [y,m,day]=s.split('-').map(Number);
+  return new Date(Date.UTC(y,m-1,day));
+}
+function today(){
+  const n=new Date();
+  return new Date(Date.UTC(n.getFullYear(),n.getMonth(),n.getDate()));
+}
+
+const PLANETS=[
+  {name:'Mercury',period:87.969,  au:0.39,color:'#b4b4b9',size:5, mean_lon:252.25,spin_days:58.646,  radius_km:2440,  orbital_speed_km_s:47.4},
+  {name:'Venus',  period:224.701, au:0.72,color:'#f0be50',size:7, mean_lon:181.98,spin_days:-243.025,radius_km:6052,  orbital_speed_km_s:35.0},
+  {name:'Earth',  period:365.256, au:1.00,color:'#3c8cdc',size:8, mean_lon:100.46,spin_days:0.9973,  radius_km:6371,  orbital_speed_km_s:29.8},
+  {name:'Mars',   period:686.971, au:1.52,color:'#c84632',size:6, mean_lon:355.45,spin_days:1.026,   radius_km:3390,  orbital_speed_km_s:24.1},
+  {name:'Jupiter',period:4332.59, au:5.20,color:'#d29164',size:16,mean_lon:34.40, spin_days:0.4135,  radius_km:69911, orbital_speed_km_s:13.1},
+  {name:'Saturn', period:10759.2, au:9.58,color:'#d2b26e',size:13,mean_lon:49.94, spin_days:0.4440,  radius_km:58232, orbital_speed_km_s:9.7},
+  {name:'Uranus', period:30688.5, au:19.2,color:'#82d2e6',size:11,mean_lon:313.23,spin_days:-0.7183, radius_km:25362, orbital_speed_km_s:6.8},
+  {name:'Neptune',period:60182.0, au:30.1,color:'#3c50c8',size:10,mean_lon:304.88,spin_days:0.6713,  radius_km:24622, orbital_speed_km_s:5.4},
+];
+const MOONS={
+  Earth:[
+    {name:'Moon',    period:27.322, dist_fac:8.0, au:0.002570,size:2.5,color:'#b4b4b4',mean_lon:218.316},
+  ],
+  Mars:[
+    {name:'Phobos',  period:0.319,  dist_fac:5.0, au:0.000063,size:1.5,color:'#a08c78',mean_lon:0},
+    {name:'Deimos',  period:1.263,  dist_fac:8.5, au:0.000157,size:1.5,color:'#96826e',mean_lon:120},
+  ],
+  Jupiter:[
+    {name:'Io',      period:1.769,  dist_fac:5.5, au:0.002819,size:2.0,color:'#dcb450',mean_lon:0},
+    {name:'Europa',  period:3.551,  dist_fac:7.5, au:0.004486,size:1.8,color:'#c8beaa',mean_lon:90},
+    {name:'Ganymede',period:7.155,  dist_fac:10.5,au:0.007155,size:2.5,color:'#a09682',mean_lon:180},
+    {name:'Callisto',period:16.690, dist_fac:14.5,au:0.012588,size:2.2,color:'#786e64',mean_lon:270},
+  ],
+  Saturn:[
+    {name:'Enceladus',period:1.370, dist_fac:6.5, au:0.001592,size:1.5,color:'#e6e6f0',mean_lon:0},
+    {name:'Tethys',  period:1.888,  dist_fac:8.5, au:0.001971,size:1.8,color:'#d2d2dc',mean_lon:72},
+    {name:'Dione',   period:2.737,  dist_fac:11.0,au:0.002524,size:1.8,color:'#c8c8d2',mean_lon:144},
+    {name:'Rhea',    period:4.518,  dist_fac:13.5,au:0.003524,size:2.0,color:'#beb9b4',mean_lon:216},
+    {name:'Titan',   period:15.950, dist_fac:19.0,au:0.008169,size:2.8,color:'#d2aa5a',mean_lon:288},
+  ],
+  Uranus:[
+    {name:'Miranda', period:1.414,  dist_fac:5.0, au:0.000865,size:1.5,color:'#aac8d2',mean_lon:0},
+    {name:'Ariel',   period:2.520,  dist_fac:7.0, au:0.001277,size:1.8,color:'#a0c3d2',mean_lon:90},
+    {name:'Umbriel', period:4.144,  dist_fac:9.5, au:0.001779,size:1.8,color:'#6e7882',mean_lon:180},
+    {name:'Titania', period:8.706,  dist_fac:12.5,au:0.002915,size:2.0,color:'#96aab4',mean_lon:270},
+    {name:'Oberon',  period:13.460, dist_fac:15.5,au:0.003902,size:2.0,color:'#8c96a0',mean_lon:45},
+  ],
+  Neptune:[
+    {name:'Triton',  period:5.877,  dist_fac:8.5, au:0.002372,size:2.2,color:'#aabeDC',mean_lon:0},
+  ],
+};
+const ZODIAC=[
+  {name:'Aries',      symbol:'♈',color:'#dc5050'},
+  {name:'Taurus',     symbol:'♉',color:'#64b450'},
+  {name:'Gemini',     symbol:'♊',color:'#dcc83c'},
+  {name:'Cancer',     symbol:'♋',color:'#50a0c8'},
+  {name:'Leo',        symbol:'♌',color:'#e68c28'},
+  {name:'Virgo',      symbol:'♍',color:'#a064c8'},
+  {name:'Libra',      symbol:'♎',color:'#50c8b4'},
+  {name:'Scorpio',    symbol:'♏',color:'#b4283c'},
+  {name:'Sagittarius',symbol:'♐',color:'#c8783c'},
+  {name:'Capricorn',  symbol:'♑',color:'#507890'},
+  {name:'Aquarius',   symbol:'♒',color:'#3cb4dc'},
+  {name:'Pisces',     symbol:'♓',color:'#8c50c8'},
+];
+const ZODIAC_NAMES_EN=['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'];
+const ZODIAC_NAMES_UK=['Овен','Телець','Близнюки','Рак','Лев','Діва','Терези','Скорпіон','Стрілець','Козеріг','Водолій','Риби'];
+const MOON_PHASE_SYMBOLS=['🌑','🌒','🌓','🌔','🌕','🌖','🌗','🌘'];
+const MOON_PHASE_NAMES=['New Moon','Waxing Crescent','First Quarter','Waxing Gibbous','Full Moon','Waning Gibbous','Last Quarter','Waning Crescent'];
+const ST_TARGETS=[[0,1],[45,0],[90,2],[135,0],[180,1],[225,0],[270,2],[315,0]];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ORBITAL MATH
+// ─────────────────────────────────────────────────────────────────────────────
+function planetAngleDeg(planet, d){
+  const days=daysSinceJ2000(d);
+  return ((planet.mean_lon + 360*days/planet.period) % 360 + 360) % 360;
+}
+function computeMoonPhaseAngle(d){
+  const days=daysSinceJ2000(d);
+  const moon=MOONS.Earth[0];
+  const moonLon=((moon.mean_lon + 360*days/moon.period)%360+360)%360;
+  const earth=PLANETS[2];
+  const earthLon=planetAngleDeg(earth,d);
+  const sunGeo=(earthLon+180)%360;
+  return ((moonLon-sunGeo)%360+360)%360;
+}
+function moonPhaseInfo(d){
+  const angle=computeMoonPhaseAngle(d);
+  const idx=Math.floor((angle+22.5)/45)%8;
+  const illum=Math.round((1-Math.cos(angle*Math.PI/180))/2*100);
+  return {symbol:MOON_PHASE_SYMBOLS[idx],name:MOON_PHASE_NAMES[idx],illum,angle};
+}
+function lonDiff(a,b){
+  let d=(b-a)%360;
+  if(d>180) d-=360;
+  if(d<-180) d+=360;
+  return d;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ALIGNMENT
+// ─────────────────────────────────────────────────────────────────────────────
+function countAlignment(d,threshold=15){
+  const angles=PLANETS.map(p=>planetAngleDeg(p,d)).sort((a,b)=>a-b);
+  const n=angles.length;
+  const ext=[...angles,...angles.map(a=>a+360)];
+  let best=0;
+  for(let i=0;i<n;i++){
+    let j=i;
+    while(j<i+n && ext[j]-ext[i]<=threshold) j++;
+    best=Math.max(best,j-i);
+  }
+  return best;
+}
+function alignMarkColor(count){
+  const t=Math.max(0,Math.min(1,(count-3)/5));
+  let r,g,b;
+  if(t<0.33){const s=t/0.33;r=30;g=Math.round(80+s*140);b=Math.round(255-s*175);}
+  else if(t<0.67){const s=(t-0.33)/0.34;r=Math.round(30+s*210);g=220;b=Math.round(80-s*50);}
+  else{const s=(t-0.67)/0.33;r=255;g=Math.round(220-s*170);b=30;}
+  return `rgba(${r},${g},${b},0.87)`;
+}
+function computeAlignments(dateMin,dateMax,minPlanets=3){
+  const marks=[];
+  const total=Math.round((dateMax-dateMin)/86400000);
+  let cooldown=0;
+  for(let i=0;i<=total;i++){
+    if(cooldown>0){cooldown--;continue;}
+    const d=dateFromOffset(dateMin,i);
+    const cnt=countAlignment(d);
+    if(cnt>=minPlanets){marks.push({offset:i,count:cnt});cooldown=7;}
+  }
+  return marks;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SOLAR TERMS
+// ─────────────────────────────────────────────────────────────────────────────
+function computeSolarTerms(dateMin,dateMax){
+  const earth=PLANETS[2];
+  const results=[];
+  const total=Math.round((dateMax-dateMin)/86400000);
+  let prev=null;
+  for(let i=0;i<=total+2;i++){
+    const d=dateFromOffset(dateMin,i);
+    const lon=((planetAngleDeg(earth,d)+180)%360+360)%360;
+    if(prev!==null){
+      const step=((lon-prev)%360+360)%360;
+      if(step>0&&step<5){
+        for(const [target,kind] of ST_TARGETS){
+          const gap=((target-prev)%360+360)%360;
+          if(gap<step){
+            const frac=step>0?gap/step:0;
+            results.push({offset:Math.max(0,i-1+frac),kind});
+          }
+        }
+      }
+    }
+    prev=lon;
+  }
+  return results;
+}
+const ST_COLORS=['rgba(180,120,255,0.87)','rgba(80,210,160,0.87)','rgba(255,210,60,0.87)'];
+const ST_SYMBOLS=['◆','⊕','☀'];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────────────────────────
+let state={
+  currentDate:today(),
+  sliderMin:isoToDate('2024-01-01'),
+  sliderMax:isoToDate('2029-01-01'),
+  zoom:1.0,
+  evenMode:true,
+  geoMode:false,
+  showZodiac:false,
+  showSectors:false,
+  showTrail:false,
+  showInfo:false,
+  showMarks:true,
+  planetScale:1.0,
+  zodiacFontScale:1.0,
+  minAlignPlanets:3,
+  lang:'en',
+  selectedPlanet:null,
+  playing:false,
+  animStep:1,
+  alignmentMarks:[],
+  solarTerms:[],
+  eventTimeSuffix:null,  // set when snapped to a solar term; shown in date label
+};
+
+const planetScreenPos={};   // name -> {x,y,r}
+let starsCache=null;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LOCALSTORAGE
+// ─────────────────────────────────────────────────────────────────────────────
+const LS_KEY='solarSystem_v2';
+function saveSettings(){
+  const s={
+    sliderMin:dateToISO(state.sliderMin),
+    sliderMax:dateToISO(state.sliderMax),
+    currentDate:dateToISO(state.currentDate),
+    zoom:Math.round(state.zoom*100),
+    evenMode:state.evenMode,
+    geoMode:state.geoMode,
+    showZodiac:state.showZodiac,
+    showSectors:state.showSectors,
+    showTrail:state.showTrail,
+    showInfo:state.showInfo,
+    showMarks:state.showMarks,
+    planetScale:Math.round(state.planetScale*100),
+    zodiacFontScale:Math.round(state.zodiacFontScale*100),
+    minAlignPlanets:state.minAlignPlanets,
+    lang:state.lang,
+  };
+  localStorage.setItem(LS_KEY,JSON.stringify(s));
+}
+function loadSettings(){
+  try{
+    const raw=localStorage.getItem(LS_KEY);
+    if(!raw) return;
+    const s=JSON.parse(raw);
+    if(s.sliderMin) state.sliderMin=isoToDate(s.sliderMin);
+    if(s.sliderMax) state.sliderMax=isoToDate(s.sliderMax);
+    if(s.currentDate) state.currentDate=isoToDate(s.currentDate);
+    if(s.zoom!=null) state.zoom=s.zoom/100;
+    if(s.evenMode!=null) state.evenMode=!!s.evenMode;
+    if(s.geoMode!=null) state.geoMode=!!s.geoMode;
+    if(s.showZodiac!=null) state.showZodiac=!!s.showZodiac;
+    if(s.showSectors!=null) state.showSectors=!!s.showSectors;
+    if(s.showTrail!=null) state.showTrail=!!s.showTrail;
+    if(s.showInfo!=null) state.showInfo=!!s.showInfo;
+    if(s.showMarks!=null) state.showMarks=!!s.showMarks;
+    if(s.planetScale!=null) state.planetScale=s.planetScale/100;
+    if(s.zodiacFontScale!=null) state.zodiacFontScale=s.zodiacFontScale/100;
+    if(s.minAlignPlanets!=null) state.minAlignPlanets=s.minAlignPlanets;
+    if(s.lang) state.lang=s.lang;
+  }catch(e){}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CANVAS & DRAWING
+// ─────────────────────────────────────────────────────────────────────────────
+const cv=document.getElementById('cv');
+const ctx=cv.getContext('2d');
+
+function resizeCanvas(){
+  const wrap=document.getElementById('canvasWrap');
+  cv.width=wrap.clientWidth;
+  cv.height=wrap.clientHeight;
+  starsCache=null;
+  draw();
+}
+
+function buildStars(w,h){
+  const arr=[];
+  // deterministic LCG
+  let seed=42;
+  function rand(){seed=(seed*1664525+1013904223)&0xffffffff;return(seed>>>0)/4294967296;}
+  for(let i=0;i<280;i++){
+    const x=Math.floor(rand()*w);
+    const y=Math.floor(rand()*h);
+    const r=rand();
+    arr.push({x,y,a:Math.floor(r*70+20),s:r*1.6});
+  }
+  return arr;
+}
+
+function hexToRgb(hex){
+  const r=parseInt(hex.slice(1,3),16);
+  const g=parseInt(hex.slice(3,5),16);
+  const b=parseInt(hex.slice(5,7),16);
+  return {r,g,b};
+}
+function colorAlpha(hex,a){
+  const {r,g,b}=hexToRgb(hex);
+  return `rgba(${r},${g},${b},${a})`;
+}
+function lighten(hex,pct){
+  let {r,g,b}=hexToRgb(hex);
+  r=Math.min(255,Math.round(r+(255-r)*pct/100));
+  g=Math.min(255,Math.round(g+(255-g)*pct/100));
+  b=Math.min(255,Math.round(b+(255-b)*pct/100));
+  return `rgb(${r},${g},${b})`;
+}
+function darken(hex,pct){
+  let {r,g,b}=hexToRgb(hex);
+  r=Math.max(0,Math.round(r*(1-pct/100)));
+  g=Math.max(0,Math.round(g*(1-pct/100)));
+  b=Math.max(0,Math.round(b*(1-pct/100)));
+  return `rgb(${r},${g},${b})`;
+}
+
+function draw(){
+  const w=cv.width, h=cv.height;
+  if(!w||!h) return;
+  ctx.clearRect(0,0,w,h);
+  ctx.fillStyle='#06060f';
+  ctx.fillRect(0,0,w,h);
+
+  // Stars
+  if(!starsCache) starsCache=buildStars(w,h);
+  for(const s of starsCache){
+    ctx.beginPath();
+    ctx.arc(s.x,s.y,s.s,0,Math.PI*2);
+    ctx.fillStyle=`rgba(200,210,255,${s.a/255})`;
+    ctx.fill();
+  }
+
+  const cx=w/2, cy=h/2;
+  const MAX_AU=38;
+  const scale=Math.min(w,h)/2/MAX_AU*0.92*state.zoom;
+  const n=PLANETS.length;
+  const halfCanvas=Math.min(w,h)/2;
+  const zodiacInner=halfCanvas*0.80;
+  const evenStep=zodiacInner/(n+1);
+
+  const earth=PLANETS[2];
+  const earthIdx=2;
+  const earthOrbitR=state.evenMode ? evenStep*(earthIdx+1) : earth.au*scale;
+  const earthAngle=planetAngleDeg(earth,state.currentDate)*Math.PI/180;
+  const earthHx=earthOrbitR*Math.cos(earthAngle);
+  const earthHy=-earthOrbitR*Math.sin(earthAngle);
+
+  const tx=state.geoMode ? cx-earthHx : cx;
+  const ty=state.geoMode ? cy-earthHy : cy;
+
+  // Zodiac (geo mode only)
+  if(state.geoMode){
+    ctx.save();
+    ctx.translate(cx,cy);
+    if(state.showSectors) drawZodiacSectors(w,h);
+    if(state.showZodiac)  drawZodiac(w,h);
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.translate(tx,ty);
+
+  // Trails
+  if(state.showTrail && state.geoMode && state.selectedPlanet)
+    drawTrails(scale,earthHx,earthHy,evenStep);
+
+  // Sun
+  drawSun(scale,evenStep);
+
+  // Orbits + planets
+  for(const key in planetScreenPos) delete planetScreenPos[key];
+  for(let idx=0;idx<PLANETS.length;idx++){
+    const planet=PLANETS[idx];
+    const orbitR=state.evenMode ? evenStep*(idx+1) : planet.au*scale;
+    if(!state.geoMode){
+      const showOrbit=state.selectedPlanet===null||state.selectedPlanet===planet.name;
+      if(showOrbit) drawOrbit(orbitR);
+    }
+    const angleDeg=planetAngleDeg(planet,state.currentDate);
+    const ar=angleDeg*Math.PI/180;
+    const px=orbitR*Math.cos(ar);
+    const py=-orbitR*Math.sin(ar);
+    const pr=planet.size/2*state.planetScale;
+    planetScreenPos[planet.name]={x:tx+px,y:ty+py,r:pr};
+    drawPlanet(planet,px,py,scale,evenStep);
+  }
+
+  ctx.restore();
+
+  // Overlays (no translate)
+  drawDateLabel(w,h);
+  drawMoonPhaseOverlay(w,h);
+  if(state.showInfo && state.selectedPlanet) drawInfoPanel(w,h);
+}
+
+function drawOrbit(r){
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(0,0,r,0,Math.PI*2);
+  ctx.strokeStyle=state.geoMode ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.16)';
+  ctx.lineWidth=state.geoMode ? 1 : 1.8;
+  ctx.setLineDash([4,4]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+function drawSun(scale,evenStep){
+  let sunR;
+  if(state.evenMode&&evenStep>0) sunR=evenStep*0.38;
+  else sunR=Math.max(6,scale*0.12);
+
+  const glows=[{r:sunR*3.8,a:0.07},{r:sunR*2.8,a:0.14},{r:sunR*2.0,a:0.24},{r:sunR*1.4,a:0.47}];
+  for(const g of glows){
+    const gr=ctx.createRadialGradient(0,0,0,0,0,g.r);
+    gr.addColorStop(0,`rgba(255,230,100,${g.a})`);
+    gr.addColorStop(1,'rgba(255,150,50,0)');
+    ctx.beginPath(); ctx.arc(0,0,g.r,0,Math.PI*2);
+    ctx.fillStyle=gr; ctx.fill();
+  }
+  const off=sunR*0.25;
+  const gr=ctx.createRadialGradient(-off,-off,0,-off,-off,sunR*1.1);
+  gr.addColorStop(0,'#ffffc8');
+  gr.addColorStop(0.6,'#ffc850');
+  gr.addColorStop(1,'#e6821e');
+  ctx.beginPath(); ctx.arc(0,0,sunR,0,Math.PI*2);
+  ctx.fillStyle=gr; ctx.fill();
+}
+
+function drawPlanet(planet,px,py,scale,evenStep){
+  const color=planet.color;
+  const r=planet.size/2*state.planetScale;
+
+  // Selection ring
+  if(state.selectedPlanet===planet.name){
+    ctx.beginPath();
+    ctx.arc(px,py,r+5,0,Math.PI*2);
+    ctx.strokeStyle='rgba(255,255,120,0.78)';
+    ctx.lineWidth=2;
+    ctx.stroke();
+  }
+
+  // Glow
+  const gr=ctx.createRadialGradient(px,py,0,px,py,r*2.5);
+  gr.addColorStop(0,colorAlpha(color,0.24));
+  gr.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.beginPath(); ctx.arc(px,py,r*2.5,0,Math.PI*2);
+  ctx.fillStyle=gr; ctx.fill();
+
+  // Disk
+  const dg=ctx.createRadialGradient(px-r*0.3,py-r*0.3,0,px,py,r*1.2);
+  dg.addColorStop(0,lighten(color,50));
+  dg.addColorStop(1,darken(color,23));
+  ctx.beginPath(); ctx.arc(px,py,r,0,Math.PI*2);
+  ctx.fillStyle=dg; ctx.fill();
+
+  // Saturn rings
+  if(planet.name==='Saturn'){
+    ctx.save();
+    for(const [rr,lw] of [[r*1.7,2],[r*2.1,1.5],[r*2.5,1]]){
+      ctx.beginPath();
+      ctx.ellipse(px,py,rr,rr*0.35,0,0,Math.PI*2);
+      ctx.strokeStyle='rgba(210,190,140,0.63)';
+      ctx.lineWidth=lw;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Moons
+  drawMoons(planet,px,py);
+
+  // Label
+  ctx.fillStyle=lighten(color,60);
+  ctx.font=`10px 'Segoe UI',Arial,sans-serif`;
+  ctx.fillText(planet.name, px+r+3, py-r);
+}
+
+function drawMoons(planet,px,py){
+  const moons=MOONS[planet.name];
+  if(!moons||!moons.length) return;
+  const planetR=planet.size/2;
+  const days=daysSinceJ2000(state.currentDate);
+  const geoEarth=state.geoMode && planet.name==='Earth';
+  const soloEarth=!state.geoMode && planet.name==='Earth';
+  const moonOrbitMult=geoEarth?1.5:(soloEarth?1.2:1.0);
+  const moonSizeMult=geoEarth?3.5:(soloEarth?2.5:1.0);
+
+  const maxAu=Math.max(...moons.map(m=>m.au));
+
+  for(const moon of moons){
+    let orbitR;
+    if(state.evenMode){
+      orbitR=planetR*moon.dist_fac*moonOrbitMult;
+    } else {
+      orbitR=Math.max(planetR*2, planetR*6*moon.au/maxAu)*moonOrbitMult;
+    }
+    drawSingleMoon(moon,px,py,orbitR,days,moonSizeMult);
+  }
+}
+
+function drawSingleMoon(moon,px,py,orbitR,days,sizeMult=1){
+  // Orbit ring
+  ctx.beginPath();
+  ctx.arc(px,py,orbitR,0,Math.PI*2);
+  ctx.strokeStyle='rgba(255,255,255,0.08)';
+  ctx.lineWidth=1;
+  ctx.stroke();
+  // Position
+  const ang=((moon.mean_lon + 360*days/moon.period)%360)*Math.PI/180;
+  const mx=px+orbitR*Math.cos(ang);
+  const my=py-orbitR*Math.sin(ang);
+  const mr=moon.size/2*sizeMult;
+  // Glow
+  const gr=ctx.createRadialGradient(mx,my,0,mx,my,mr*2.2);
+  gr.addColorStop(0,colorAlpha(moon.color,0.20));
+  gr.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.beginPath(); ctx.arc(mx,my,mr*2.2,0,Math.PI*2);
+  ctx.fillStyle=gr; ctx.fill();
+  // Disk
+  ctx.beginPath(); ctx.arc(mx,my,mr,0,Math.PI*2);
+  ctx.fillStyle=moon.color;
+  ctx.fill();
+}
+
+function drawZodiacSectors(w,h){
+  const half=Math.min(w,h)/2;
+  const outerR=half*0.975;
+  for(let i=0;i<12;i++){
+    const startDeg=i*30, endDeg=startDeg+30;
+    const startR=startDeg*Math.PI/180, endR=endDeg*Math.PI/180;
+    const {r,g,b}=hexToRgb(ZODIAC[i].color);
+    const alpha=i%2===0?0.086:0.051;
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.arc(0,0,outerR,-startR,-endR,true);
+    ctx.closePath();
+    ctx.fillStyle=`rgba(${r},${g},${b},${alpha})`;
+    ctx.fill();
+  }
+  ctx.strokeStyle='rgba(255,255,255,0.10)';
+  ctx.lineWidth=0.8;
+  for(let i=0;i<12;i++){
+    const ar=i*30*Math.PI/180;
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.lineTo(outerR*Math.cos(-ar),outerR*Math.sin(-ar));
+    ctx.stroke();
+  }
+}
+
+function drawZodiac(w,h){
+  const half=Math.min(w,h)/2;
+  const outerR=half*0.975;
+  const innerR=half*0.80;
+  const labelR=(outerR+innerR)/2;
+  const bandH=outerR-innerR;
+  const names=state.lang==='uk'?ZODIAC_NAMES_UK:ZODIAC_NAMES_EN;
+
+  for(let i=0;i<12;i++){
+    const startDeg=i*30, endDeg=startDeg+30;
+    const {r,g,b}=hexToRgb(ZODIAC[i].color);
+    // Annular sector
+    ctx.beginPath();
+    ctx.arc(0,0,outerR,-startDeg*Math.PI/180,-(endDeg)*Math.PI/180,true);
+    ctx.arc(0,0,innerR,-(endDeg)*Math.PI/180,-startDeg*Math.PI/180,false);
+    ctx.closePath();
+    ctx.fillStyle=`rgba(${r},${g},${b},${i%2===0?0.118:0.078})`;
+    ctx.fill();
+    // Boundary
+    ctx.strokeStyle=`rgba(${r},${g},${b},0.275)`;
+    ctx.lineWidth=1;
+    ctx.beginPath();
+    const ar=startDeg*Math.PI/180;
+    ctx.moveTo(innerR*Math.cos(-ar),innerR*Math.sin(-ar));
+    ctx.lineTo(outerR*Math.cos(-ar),outerR*Math.sin(-ar));
+    ctx.stroke();
+    // Labels
+    const mid=startDeg+15;
+    const mr2=mid*Math.PI/180;
+    const lx=labelR*Math.cos(-mr2);
+    const ly=labelR*Math.sin(-mr2);
+    ctx.save();
+    ctx.translate(lx,ly);
+    ctx.rotate(mr2);
+    const symH=Math.min(bandH*0.52,16)*state.zodiacFontScale;
+    const nameH=Math.min(bandH*0.32,11)*state.zodiacFontScale;
+    ctx.textAlign='center';
+    ctx.fillStyle=`rgba(${r},${g},${b},0.90)`;
+    ctx.font=`${Math.max(9,Math.round(symH))}px 'Segoe UI Symbol','Segoe UI Emoji',Arial`;
+    ctx.fillText(ZODIAC[i].symbol,0,0);
+    ctx.fillStyle=`rgba(${r},${g},${b},0.67)`;
+    ctx.font=`${Math.max(6,Math.round(nameH))}px 'Segoe UI',Arial`;
+    ctx.fillText(names[i]||ZODIAC[i].name,0,nameH+2);
+    ctx.restore();
+  }
+}
+
+function drawTrails(scale,earthHx,earthHy,evenStep){
+  const STEP=5, HALF=550;
+  const earthP=PLANETS[2], earthIdx=2;
+  const curAbs=Math.round((state.currentDate-state.sliderMin)/86400000);
+  const rangeHi=Math.round((state.sliderMax-state.sliderMin)/86400000);
+  const rAuE=earthP.au*scale;
+
+  for(const planet of PLANETS){
+    if(planet.name==='Earth'||planet.name!==state.selectedPlanet) continue;
+    const pIdx=PLANETS.indexOf(planet);
+    const rVisP=state.evenMode?evenStep*(pIdx+1):planet.au*scale;
+    const rVisE=state.evenMode?evenStep*(earthIdx+1):earthP.au*scale;
+    const rAuP=planet.au*scale;
+    const pts=[], lons=[];
+    let lo=Math.max(0,curAbs-HALF);
+    let hi=Math.min(rangeHi,curAbs+HALF);
+    lo=Math.floor(lo/STEP)*STEP;
+
+    for(let day=lo;day<=hi;day+=STEP){
+      const d=dateFromOffset(state.sliderMin,day);
+      const angP=planetAngleDeg(planet,d)*Math.PI/180;
+      const angE=planetAngleDeg(earthP,d)*Math.PI/180;
+      const txP=rVisP*Math.cos(angP)-rVisE*Math.cos(angE)+earthHx;
+      const tyP=-rVisP*Math.sin(angP)+rVisE*Math.sin(angE)+earthHy;
+      const gx=rAuP*Math.cos(angP)-rAuE*Math.cos(angE);
+      const gy=-(-rAuP*Math.sin(angP)+rAuE*Math.sin(angE));
+      const lon=((Math.atan2(gy,gx)*180/Math.PI)%360+360)%360;
+      pts.push({x:txP,y:tyP,day});
+      lons.push(lon);
+    }
+    if(pts.length<3) continue;
+
+    // Draw polyline
+    for(let i=0;i<pts.length-1;i++){
+      const alpha=pts[i].day<curAbs?0.196:0.392;
+      const {r,g,b}=hexToRgb(planet.color);
+      ctx.beginPath();
+      ctx.moveTo(pts[i].x,pts[i].y);
+      ctx.lineTo(pts[i+1].x,pts[i+1].y);
+      ctx.strokeStyle=`rgba(${r},${g},${b},${alpha})`;
+      ctx.lineWidth=1.2;
+      ctx.stroke();
+    }
+
+    // Retrograde stations
+    for(let i=1;i<pts.length-1;i++){
+      const dp=lonDiff(lons[i-1],lons[i]);
+      const dn=lonDiff(lons[i],lons[i+1]);
+      if(dp>0.05&&dn<-0.05){
+        drawStation(pts[i].x,pts[i].y,'rgba(255,90,50,0.90)','rgba(255,160,120,0.86)','R');
+      } else if(dp<-0.05&&dn>0.05){
+        drawStation(pts[i].x,pts[i].y,'rgba(60,210,170,0.90)','rgba(120,230,200,0.86)','D');
+      }
+    }
+  }
+}
+
+function drawStation(x,y,dotColor,lblColor,lbl){
+  ctx.beginPath();
+  ctx.arc(x,y,4.5,0,Math.PI*2);
+  ctx.fillStyle=dotColor;
+  ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,0.55)';
+  ctx.lineWidth=0.8;
+  ctx.stroke();
+  ctx.fillStyle=lblColor;
+  ctx.font='bold 8px Segoe UI,Arial';
+  ctx.fillText(lbl,x+6,y+4);
+}
+
+function currentTimeStr(){
+  const n=new Date();
+  return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
+}
+
+function offsetToEventTime(fractionalOffset, kind){
+  // The fractional part encodes sub-day time: frac * 24 * 60 = total minutes
+  const frac = fractionalOffset - Math.floor(fractionalOffset);
+  const totalMin = Math.round(frac * 24 * 60);
+  const h = Math.floor(totalMin / 60) % 24;
+  const m = totalMin % 60;
+  const sym = ST_SYMBOLS[kind] || '';
+  return `${sym} ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
+
+function drawDateLabel(w,h){
+  const d=state.currentDate;
+  const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const dateTxt=`${months[d.getUTCMonth()]} ${String(d.getUTCDate()).padStart(2,'0')}, ${d.getUTCFullYear()}`;
+  const timeTxt = state.eventTimeSuffix !== null ? state.eventTimeSuffix : `⏱ ${currentTimeStr()}`;
+  const fullTxt=`${dateTxt}  ${timeTxt}`;
+  ctx.font=`bold 14px 'Segoe UI',Arial`;
+  ctx.fillStyle='rgba(200,220,255,0.82)';
+  ctx.textAlign='left';
+  ctx.textBaseline='middle';
+  ctx.fillText(fullTxt,12,h-20);
+}
+
+function drawMoonPhaseOverlay(w,h){
+  const {symbol,name,illum,angle}=moonPhaseInfo(state.currentDate);
+  const pad=12, diskR=34, boxW=170, boxH=diskR*2+52;
+  const bx=pad, by=pad;
+
+  // Panel background
+  ctx.beginPath();
+  roundRect(ctx,bx,by,boxW,boxH,8);
+  ctx.fillStyle='rgba(8,15,38,0.784)';
+  ctx.fill();
+  ctx.strokeStyle='rgba(100,140,200,0.47)';
+  ctx.lineWidth=1;
+  ctx.stroke();
+
+  const mcx=bx+diskR+pad;
+  const mcy=by+diskR+pad;
+
+  // Dark base
+  ctx.beginPath();
+  ctx.arc(mcx,mcy,diskR,0,Math.PI*2);
+  ctx.fillStyle='#1e2030';
+  ctx.fill();
+
+  // Lit region
+  drawMoonLitRegion(mcx,mcy,diskR,angle);
+
+  // Rim
+  ctx.beginPath();
+  ctx.arc(mcx,mcy,diskR,0,Math.PI*2);
+  ctx.strokeStyle='rgba(180,180,160,0.31)';
+  ctx.lineWidth=0.8;
+  ctx.stroke();
+
+  // Text
+  const tx=bx+diskR*2+pad*2;
+  const tw=boxW-diskR*2-pad*3;
+  ctx.textAlign='left'; ctx.textBaseline='middle';
+  ctx.font=`bold 10px 'Segoe UI',Arial`;
+  ctx.fillStyle='rgba(210,230,255,0.90)';
+  ctx.fillText(name,tx,by+pad+9);
+  ctx.font=`9px 'Segoe UI',Arial`;
+  ctx.fillStyle='rgba(150,190,240,0.784)';
+  ctx.fillText(`Illuminated: ${illum}%`,tx,by+pad+29);
+
+  // Bar
+  const barY=by+pad+44, barX=tx, barW=Math.min(tw,80), barH=6;
+  ctx.beginPath(); roundRect(ctx,barX,barY,barW,barH,3);
+  ctx.fillStyle='rgba(30,40,70,1)'; ctx.fill();
+  ctx.beginPath(); roundRect(ctx,barX,barY,barW*illum/100,barH,3);
+  ctx.fillStyle='rgba(200,220,255,0.784)'; ctx.fill();
+}
+
+function drawMoonLitRegion(mcx,mcy,diskR,angle){
+  if(angle<0.5||angle>359.5) return; // new moon
+  if(Math.abs(angle-180)<0.5){       // full moon
+    const mg=ctx.createRadialGradient(mcx-diskR*0.25,mcy-diskR*0.25,0,mcx,mcy,diskR*1.3);
+    mg.addColorStop(0,'#f0f0dc'); mg.addColorStop(1,'#b4b4a0');
+    ctx.beginPath(); ctx.arc(mcx,mcy,diskR,0,Math.PI*2);
+    ctx.fillStyle=mg; ctx.fill();
+    return;
+  }
+
+  const K=0.5523;
+  const phaseR=angle*Math.PI/180;
+  ctx.save();
+  ctx.beginPath(); ctx.arc(mcx,mcy,diskR,0,Math.PI*2);
+  ctx.clip();
+
+  const mg=ctx.createRadialGradient(mcx-diskR*0.25,mcy-diskR*0.25,0,mcx,mcy,diskR*1.3);
+  mg.addColorStop(0,'#f0f0dc'); mg.addColorStop(1,'#b4b4a0');
+
+  if(angle<180){ // Waxing
+    const tx=Math.cos(phaseR)*diskR;
+    ctx.beginPath();
+    ctx.arc(mcx,mcy,diskR,-Math.PI/2,Math.PI/2); // right limb
+    ctx.bezierCurveTo(mcx+K*tx,mcy+diskR, mcx+tx,mcy+K*diskR, mcx+tx,mcy);
+    ctx.bezierCurveTo(mcx+tx,mcy-K*diskR, mcx+K*tx,mcy-diskR, mcx,mcy-diskR);
+    ctx.closePath();
+  } else { // Waning
+    const tx=-Math.cos(phaseR)*diskR;
+    ctx.beginPath();
+    ctx.arc(mcx,mcy,diskR,-Math.PI/2,Math.PI/2,true); // left limb: top→LEFT→bottom (anticlockwise)
+    ctx.bezierCurveTo(mcx+K*tx,mcy+diskR, mcx+tx,mcy+K*diskR, mcx+tx,mcy);
+    ctx.bezierCurveTo(mcx+tx,mcy-K*diskR, mcx+K*tx,mcy-diskR, mcx,mcy-diskR);
+    ctx.closePath();
+  }
+  ctx.fillStyle=mg;
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawInfoPanel(w,h){
+  const planet=PLANETS.find(p=>p.name===state.selectedPlanet);
+  if(!planet) return;
+
+  const earth=PLANETS[2];
+  let distStr='—';
+  if(planet.name!=='Earth'){
+    const angE=planetAngleDeg(earth,state.currentDate)*Math.PI/180;
+    const angP=planetAngleDeg(planet,state.currentDate)*Math.PI/180;
+    const ex=earth.au*Math.cos(angE), ey=earth.au*Math.sin(angE);
+    const px2=planet.au*Math.cos(angP), py2=planet.au*Math.sin(angP);
+    const distAu=Math.hypot(px2-ex,py2-ey);
+    const distKm=distAu*149597870.7;
+    distStr=distKm>=1e6?`${(distKm/1e6).toFixed(2)} M km`:`${Math.round(distKm).toLocaleString()} km`;
+  }
+
+  const lines=[
+    ['Orbital period',`${planet.period.toFixed(1)} days`],
+    ['Radius',`${planet.radius_km.toLocaleString()} km`],
+    ['Orbital speed',`${planet.orbital_speed_km_s} km/s`],
+    ['Rotation',planet.spin_days<0?`${Math.abs(planet.spin_days).toFixed(3)} d (retro)`:`${planet.spin_days.toFixed(3)} d`],
+    ['Distance (Sun)',`${planet.au.toFixed(2)} AU`],
+    ['Distance (Earth)',distStr],
+  ];
+
+  const pad=14, lineH=26, titleH=30;
+  const panelW=260, panelH=pad*2+titleH+lines.length*lineH+4;
+  const moonBoxBottom=pad+34*2+52+8;
+  const px0=pad, py0=moonBoxBottom;
+
+  const {r,g,b}=hexToRgb(planet.color);
+  ctx.beginPath(); roundRect(ctx,px0,py0,panelW,panelH,8);
+  ctx.fillStyle='rgba(10,18,40,0.843)'; ctx.fill();
+  ctx.strokeStyle=`rgba(${r},${g},${b},0.706)`; ctx.lineWidth=1.5; ctx.stroke();
+
+  ctx.textAlign='left'; ctx.textBaseline='middle';
+  ctx.font=`bold 14px 'Segoe UI',Arial`;
+  ctx.fillStyle=lighten(planet.color,55);
+  ctx.fillText(planet.name,px0+pad,py0+pad+titleH/2);
+
+  const sepY=py0+pad+titleH;
+  ctx.beginPath(); ctx.moveTo(px0+pad,sepY); ctx.lineTo(px0+panelW-pad,sepY);
+  ctx.strokeStyle=`rgba(${r},${g},${b},0.31)`; ctx.lineWidth=1; ctx.stroke();
+
+  const lblW=120;
+  for(let i=0;i<lines.length;i++){
+    const rowY=sepY+4+i*lineH+lineH/2;
+    ctx.font=`10px 'Segoe UI',Arial`;
+    ctx.fillStyle='rgba(140,170,210,0.82)';
+    ctx.fillText(lines[i][0]+':',px0+pad,rowY);
+    ctx.font=`bold 10px 'Segoe UI',Arial`;
+    ctx.fillStyle='rgba(220,235,255,0.94)';
+    ctx.fillText(lines[i][1],px0+pad+lblW,rowY);
+  }
+}
+
+function roundRect(c,x,y,w,h,r){
+  c.moveTo(x+r,y);
+  c.lineTo(x+w-r,y); c.arcTo(x+w,y,x+w,y+r,r);
+  c.lineTo(x+w,y+h-r); c.arcTo(x+w,y+h,x+w-r,y+h,r);
+  c.lineTo(x+r,y+h); c.arcTo(x,y+h,x,y+h-r,r);
+  c.lineTo(x,y+r); c.arcTo(x,y,x+r,y,r);
+  c.closePath();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SLIDER CANVAS (ticks, alignment marks, solar terms)
+// ─────────────────────────────────────────────────────────────────────────────
+const sliderCanvas=document.getElementById('sliderCanvas');
+const sctx=sliderCanvas.getContext('2d');
+
+function resizeSliderCanvas(){
+  const wrap=document.getElementById('sliderWrap');
+  sliderCanvas.width=wrap.clientWidth;
+  sliderCanvas.height=wrap.clientHeight;
+  drawSliderOverlay();
+}
+
+function drawSliderOverlay(){
+  const sc=sliderCanvas;
+  const w=sc.width, h=sc.height;
+  if(!w||!h) return;
+  sctx.clearRect(0,0,w,h);
+
+  const slider=document.getElementById('timeSlider');
+  const total=parseInt(slider.max)||1;
+  const gx=8, gw=w-16, gy=Math.round(h/2);
+
+  // Solar terms
+  for(const st of state.solarTerms){
+    const frac=st.offset/total;
+    if(frac<0||frac>1) continue;
+    const x=Math.round(gx+frac*gw);
+    const col=ST_COLORS[st.kind];
+    const tkH=st.kind===0?7:10;
+    sctx.beginPath();
+    sctx.moveTo(x,gy-tkH); sctx.lineTo(x,gy+tkH);
+    sctx.strokeStyle=col; sctx.lineWidth=1.2; sctx.stroke();
+    sctx.fillStyle=col;
+    sctx.font=`8px 'Segoe UI Symbol','Segoe UI Emoji',Arial`;
+    sctx.textAlign='center'; sctx.textBaseline='alphabetic';
+    sctx.fillText(ST_SYMBOLS[st.kind],x,gy-tkH-1);
+  }
+
+  // Year/month ticks
+  const dMin=state.sliderMin;
+  const dMax=state.sliderMax;
+  const nMonths=(dMax.getUTCFullYear()-dMin.getUTCFullYear())*12+dMax.getUTCMonth()-dMin.getUTCMonth();
+  const showAllMonths=nMonths<=48;
+  const showQtrMonths=nMonths<=120;
+  const {getUTCFullYear:gY,getUTCMonth:gM}=Date.prototype;
+  let yr=gY.call(dMin), mo=gM.call(dMin)+1;
+  const dMax2=new Date(dMax.getTime());
+  while(true){
+    const tickD=new Date(Date.UTC(yr,mo-1,1));
+    if(tickD>dMax2) break;
+    if(tickD>=dMin){
+      const offset=Math.round((tickD-dMin)/86400000);
+      const x=Math.round(gx+offset/total*gw);
+      if(mo===1){
+        sctx.strokeStyle='rgba(160,200,255,0.784)'; sctx.lineWidth=1.2;
+        sctx.beginPath(); sctx.moveTo(x,gy-9); sctx.lineTo(x,gy+9); sctx.stroke();
+        sctx.fillStyle='rgba(160,200,255,0.863)';
+        sctx.font=`bold 7px 'Segoe UI',Arial`;
+        sctx.textAlign='center'; sctx.textBaseline='alphabetic';
+        sctx.fillText(String(yr),x,gy-10);
+      } else {
+        const showLbl=showAllMonths||(showQtrMonths&&[4,7,10].includes(mo));
+        sctx.strokeStyle='rgba(100,140,200,0.51)'; sctx.lineWidth=0.8;
+        sctx.beginPath(); sctx.moveTo(x,gy-4); sctx.lineTo(x,gy+4); sctx.stroke();
+        if(showLbl){
+          const ABBR=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+          sctx.fillStyle='rgba(120,160,210,0.706)';
+          sctx.font=`6px 'Segoe UI',Arial`;
+          sctx.textAlign='center'; sctx.textBaseline='top';
+          sctx.fillText(ABBR[mo],x,gy+5);
+        }
+      }
+    }
+    mo++;
+    if(mo>12){mo=1;yr++;}
+  }
+
+  // Alignment marks
+  if(state.showMarks){
+    for(const mark of state.alignmentMarks){
+      const frac=mark.offset/total;
+      const x=Math.round(gx+frac*gw);
+      sctx.beginPath();
+      sctx.moveTo(x,gy-5); sctx.lineTo(x,gy+5);
+      sctx.strokeStyle=alignMarkColor(mark.count);
+      sctx.lineWidth=1.5; sctx.stroke();
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UI SYNC
+// ─────────────────────────────────────────────────────────────────────────────
+function syncAllUI(){
+  // Slider range labels
+  document.getElementById('lblMin').textContent=dateToISO(state.sliderMin);
+  document.getElementById('lblMax').textContent=dateToISO(state.sliderMax);
+  // Slider value
+  const total=Math.round((state.sliderMax-state.sliderMin)/86400000);
+  const slider=document.getElementById('timeSlider');
+  slider.max=total;
+  const curOffset=Math.max(0,Math.min(total,Math.round((state.currentDate-state.sliderMin)/86400000)));
+  slider.value=curOffset;
+  // Zoom
+  const zv=Math.round(state.zoom*100);
+  document.getElementById('zoomSlider').value=zv;
+  document.getElementById('lblZoom').textContent=(state.zoom).toFixed(2)+'×';
+  // Planet scale
+  const pv=Math.round(state.planetScale*100);
+  document.getElementById('planetSlider').value=pv;
+  document.getElementById('lblPlanet').textContent=(state.planetScale).toFixed(2)+'×';
+  // Buttons
+  setBtn('btnEven',state.evenMode);
+  setBtn('btnGeo',state.geoMode);
+  setBtn('btnZodiac',state.showZodiac);
+  setBtn('btnSectors',state.showSectors);
+  setBtn('btnTrail',state.showTrail);
+  setBtn('btnInfo',state.showInfo);
+  setBtn('btnMarks',state.showMarks);
+  // Zodiac & sector buttons only in geo mode
+  document.getElementById('btnZodiac').style.display=state.geoMode?'':'none';
+  document.getElementById('btnSectors').style.display=state.geoMode?'':'none';
+  // Zoom slider hidden in even mode
+  document.getElementById('zoomSlider').style.display=state.evenMode?'none':'';
+  document.getElementById('lblZoom').style.display=state.evenMode?'none':'';
+  document.getElementById('lblZoomText').style.display=state.evenMode?'none':'';
+  // Alignment count
+  document.getElementById('lblAlignCount').textContent=state.alignmentMarks.length;
+}
+
+function setBtn(id,active){
+  const el=document.getElementById(id);
+  if(!el) return;
+  el.classList.toggle('active',!!active);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EVENT HANDLERS
+// ─────────────────────────────────────────────────────────────────────────────
+// Canvas click → select planet
+cv.addEventListener('click',e=>{
+  const rect=cv.getBoundingClientRect();
+  const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+  let best=null, bestDist=Infinity;
+  for(const [name,pos] of Object.entries(planetScreenPos)){
+    const dist=Math.hypot(mx-pos.x,my-pos.y);
+    const hitR=Math.max(pos.r*2.2,14);
+    if(dist<=hitR&&dist<bestDist){bestDist=dist;best=name;}
+  }
+  const newSel=best===state.selectedPlanet?null:best;
+  state.selectedPlanet=newSel;
+  draw();
+});
+
+// Slider
+document.getElementById('timeSlider').addEventListener('input',e=>{
+  const offset=parseInt(e.target.value);
+  state.currentDate=dateFromOffset(state.sliderMin,offset);
+  state.eventTimeSuffix=null;  // manual drag clears event time
+  draw();
+  drawSliderOverlay();
+  saveSettings();
+});
+
+// Zoom
+document.getElementById('zoomSlider').addEventListener('input',e=>{
+  state.zoom=parseInt(e.target.value)/100;
+  document.getElementById('lblZoom').textContent=state.zoom.toFixed(2)+'×';
+  draw(); saveSettings();
+});
+
+// Planet scale
+document.getElementById('planetSlider').addEventListener('input',e=>{
+  state.planetScale=parseInt(e.target.value)/100;
+  document.getElementById('lblPlanet').textContent=state.planetScale.toFixed(2)+'×';
+  draw(); saveSettings();
+});
+
+// Play
+let animTimer=null;
+document.getElementById('btnPlay').addEventListener('click',()=>{
+  if(animTimer){
+    clearInterval(animTimer);
+    animTimer=null;
+    state.playing=false;
+    document.getElementById('btnPlay').textContent='▶';
+  } else {
+    state.playing=true;
+    document.getElementById('btnPlay').textContent='⏸';
+    animTimer=setInterval(()=>{
+      const slider=document.getElementById('timeSlider');
+      const total=parseInt(slider.max)||1;
+      let v=parseInt(slider.value)+state.animStep;
+      if(v>total) v=0;
+      slider.value=v;
+      state.currentDate=dateFromOffset(state.sliderMin,v);
+      draw();
+    },40);
+  }
+});
+
+// Now
+document.getElementById('btnNow').addEventListener('click',()=>{
+  const d=today();
+  state.currentDate=d;
+  state.eventTimeSuffix=null;
+  const slider=document.getElementById('timeSlider');
+  const offset=Math.max(0,Math.min(parseInt(slider.max),Math.round((d-state.sliderMin)/86400000)));
+  slider.value=offset;
+  draw(); drawSliderOverlay(); saveSettings();
+});
+
+// Pick date
+document.getElementById('btnPick').addEventListener('click',()=>{
+  document.getElementById('calInput').value=dateToISO(state.currentDate);
+  document.getElementById('calModal').classList.add('open');
+});
+document.getElementById('calOk').addEventListener('click',()=>{
+  const v=document.getElementById('calInput').value.trim();
+  const errEl=document.getElementById('calErr');
+  errEl.textContent='';
+  const ISO_RE=/^\d{4}-\d{2}-\d{2}$/;
+  if(!ISO_RE.test(v)){errEl.textContent='Use YYYY-MM-DD format';return;}
+  const d=isoToDate(v);
+  if(isNaN(d)){errEl.textContent='Invalid date';return;}
+  state.currentDate=d;
+  state.eventTimeSuffix=null;
+  const slider=document.getElementById('timeSlider');
+  const total=parseInt(slider.max)||1;
+  const offset=Math.max(0,Math.min(total,Math.round((state.currentDate-state.sliderMin)/86400000)));
+  slider.value=offset;
+  draw(); drawSliderOverlay(); saveSettings();
+  document.getElementById('calModal').classList.remove('open');
+});
+document.getElementById('calCancel').addEventListener('click',()=>{
+  document.getElementById('calModal').classList.remove('open');
+});
+
+// Toggle buttons
+function toggleBtn(id,key){
+  document.getElementById(id).addEventListener('click',()=>{
+    state[key]=!state[key];
+    setBtn(id,state[key]);
+    if(id==='btnGeo'){
+      document.getElementById('btnZodiac').style.display=state.geoMode?'':'none';
+      document.getElementById('btnSectors').style.display=state.geoMode?'':'none';
+    }
+    if(id==='btnEven'){
+      document.getElementById('zoomSlider').style.display=state.evenMode?'none':'';
+      document.getElementById('lblZoom').style.display=state.evenMode?'none':'';
+      document.getElementById('lblZoomText').style.display=state.evenMode?'none':'';
+    }
+    draw(); saveSettings();
+  });
+}
+toggleBtn('btnEven','evenMode');
+toggleBtn('btnGeo','geoMode');
+toggleBtn('btnZodiac','showZodiac');
+toggleBtn('btnSectors','showSectors');
+toggleBtn('btnTrail','showTrail');
+toggleBtn('btnInfo','showInfo');
+toggleBtn('btnMarks','showMarks');
+
+// Solar term nav
+document.getElementById('btnPrevST').addEventListener('click',()=>{
+  const slider=document.getElementById('timeSlider');
+  const curOffset=parseFloat(slider.value)-0.01;
+  let best=null;
+  for(const st of state.solarTerms){
+    if(st.offset<curOffset&&(best===null||st.offset>best.offset)) best=st;
+  }
+  if(best){
+    slider.value=Math.floor(best.offset);
+    state.currentDate=dateFromOffset(state.sliderMin,Math.floor(best.offset));
+    state.eventTimeSuffix=offsetToEventTime(best.offset,best.kind);
+    draw(); drawSliderOverlay(); saveSettings();
+  }
+});
+document.getElementById('btnNextST').addEventListener('click',()=>{
+  const slider=document.getElementById('timeSlider');
+  const curOffset=parseFloat(slider.value)+0.01;
+  let best=null;
+  for(const st of state.solarTerms){
+    if(st.offset>curOffset&&(best===null||st.offset<best.offset)) best=st;
+  }
+  if(best){
+    slider.value=Math.floor(best.offset);
+    state.currentDate=dateFromOffset(state.sliderMin,Math.floor(best.offset));
+    state.eventTimeSuffix=offsetToEventTime(best.offset,best.kind);
+    draw(); drawSliderOverlay(); saveSettings();
+  }
+});
+
+// Alignment nav
+document.getElementById('btnPrevAlign').addEventListener('click',()=>{
+  const slider=document.getElementById('timeSlider');
+  const cur=parseInt(slider.value);
+  const prev=state.alignmentMarks.filter(m=>m.offset<cur);
+  if(prev.length){
+    slider.value=prev[prev.length-1].offset;
+    state.currentDate=dateFromOffset(state.sliderMin,prev[prev.length-1].offset);
+    state.eventTimeSuffix=null;
+    draw(); saveSettings();
+  }
+});
+document.getElementById('btnNextAlign').addEventListener('click',()=>{
+  const slider=document.getElementById('timeSlider');
+  const cur=parseInt(slider.value);
+  const nxt=state.alignmentMarks.filter(m=>m.offset>cur);
+  if(nxt.length){
+    slider.value=nxt[0].offset;
+    state.currentDate=dateFromOffset(state.sliderMin,nxt[0].offset);
+    state.eventTimeSuffix=null;
+    draw(); saveSettings();
+  }
+});
+
+// Slider range label clicks
+document.getElementById('lblMin').addEventListener('click',()=>{
+  document.getElementById('settDateMin').value=dateToISO(state.sliderMin);
+  document.getElementById('settDateMax').value=dateToISO(state.sliderMax);
+  document.getElementById('settingsModal').classList.add('open');
+});
+document.getElementById('lblMax').addEventListener('click',()=>{
+  document.getElementById('settDateMin').value=dateToISO(state.sliderMin);
+  document.getElementById('settDateMax').value=dateToISO(state.sliderMax);
+  document.getElementById('settingsModal').classList.add('open');
+});
+
+// Settings
+document.getElementById('btnSettings').addEventListener('click',()=>{
+  document.getElementById('settLang').value=state.lang;
+  document.getElementById('settZFont').value=Math.round(state.zodiacFontScale*100);
+  document.getElementById('settZFontVal').textContent=Math.round(state.zodiacFontScale*100);
+  document.getElementById('settMinAlign').value=state.minAlignPlanets;
+  document.getElementById('settDateMin').value=dateToISO(state.sliderMin);
+  document.getElementById('settDateMax').value=dateToISO(state.sliderMax);
+  document.getElementById('settDateErr').textContent='';
+  document.getElementById('settingsModal').classList.add('open');
+  setTimeout(()=>document.getElementById('settDateMin').focus(),80);
+});
+document.getElementById('settZFont').addEventListener('input',e=>{
+  document.getElementById('settZFontVal').textContent=e.target.value;
+});
+document.getElementById('settOk').addEventListener('click',()=>{
+  const errEl=document.getElementById('settDateErr');
+  errEl.textContent='';
+  const ISO_RE=/^\d{4}-\d{2}-\d{2}$/;
+  const minStr=document.getElementById('settDateMin').value.trim();
+  const maxStr=document.getElementById('settDateMax').value.trim();
+  const newDateMin=ISO_RE.test(minStr)?isoToDate(minStr):null;
+  const newDateMax=ISO_RE.test(maxStr)?isoToDate(maxStr):null;
+  if(!newDateMin||isNaN(newDateMin)){errEl.textContent='Start date invalid — use YYYY-MM-DD';return;}
+  if(!newDateMax||isNaN(newDateMax)){errEl.textContent='End date invalid — use YYYY-MM-DD';return;}
+  if(newDateMax<=newDateMin){errEl.textContent='End date must be after start date';return;}
+  state.lang=document.getElementById('settLang').value;
+  state.zodiacFontScale=parseInt(document.getElementById('settZFont').value)/100;
+  const newMin2=parseInt(document.getElementById('settMinAlign').value);
+  if(!isNaN(newMin2)&&newMin2>=3&&newMin2<=8) state.minAlignPlanets=newMin2;
+  if(newDateMin.getTime()!==state.sliderMin.getTime()||newDateMax.getTime()!==state.sliderMax.getTime()){
+    state.sliderMin=newDateMin;
+    state.sliderMax=newDateMax;
+    rebuildSliderRange();
+  }
+  document.getElementById('settingsModal').classList.remove('open');
+  draw(); drawSliderOverlay(); saveSettings();
+});
+document.getElementById('settCancel').addEventListener('click',()=>{
+  document.getElementById('settingsModal').classList.remove('open');
+});
+
+// Close modals on overlay click
+for(const id of['settingsModal','calModal']){
+  document.getElementById(id).addEventListener('click',e=>{
+    if(e.target===document.getElementById(id))
+      document.getElementById(id).classList.remove('open');
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RANGE + ALIGNMENTS
+// ─────────────────────────────────────────────────────────────────────────────
+function rebuildSliderRange(){
+  const slider=document.getElementById('timeSlider');
+  const total=Math.round((state.sliderMax-state.sliderMin)/86400000);
+  slider.max=total;
+  const curOffset=Math.max(0,Math.min(total,Math.round((state.currentDate-state.sliderMin)/86400000)));
+  slider.value=curOffset;
+  document.getElementById('lblMin').textContent=dateToISO(state.sliderMin);
+  document.getElementById('lblMax').textContent=dateToISO(state.sliderMax);
+  // Recompute solar terms (quick)
+  state.solarTerms=computeSolarTerms(state.sliderMin,state.sliderMax);
+  // Alignments can be slow — run async
+  recomputeAlignmentsAsync();
+  drawSliderOverlay();
+}
+
+function recomputeAlignmentsAsync(){
+  // Small timeout so UI doesn't freeze
+  setTimeout(()=>{
+    state.alignmentMarks=computeAlignments(state.sliderMin,state.sliderMax,state.minAlignPlanets);
+    document.getElementById('lblAlignCount').textContent=state.alignmentMarks.length;
+    drawSliderOverlay();
+  },0);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RESIZE
+// ─────────────────────────────────────────────────────────────────────────────
+const ro=new ResizeObserver(()=>{
+  resizeCanvas();
+  resizeSliderCanvas();
+});
+ro.observe(document.getElementById('canvasWrap'));
+ro.observe(document.getElementById('sliderWrap'));
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────────────────────────
+loadSettings();
+syncAllUI();
+resizeCanvas();
+resizeSliderCanvas();
+// Recompute solar terms & alignments for saved range
+state.solarTerms=computeSolarTerms(state.sliderMin,state.sliderMax);
+recomputeAlignmentsAsync();
+draw();
+// Clock ticker – redraw every 30 s so the time stays current
+setInterval(()=>{ if(!state.playing) draw(); },30000);
+</script>
+</body>
+</html>
