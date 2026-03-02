@@ -14,10 +14,10 @@ html,body{width:100%;height:100%;overflow:hidden;background:#06060f;color:#c8d8f
 #cv{display:block;width:100%;height:100%;cursor:crosshair}
 
 /* Slider row */
-#sliderRow{display:flex;align-items:center;gap:6px;height:44px}
+#sliderRow{display:flex;align-items:center;gap:6px;height:52px}
 #sliderRow label{color:#80a0c0;font-size:9pt;white-space:nowrap;cursor:pointer;user-select:none}
 #sliderRow label:hover{color:#a0c8f0}
-#sliderWrap{flex:1;position:relative;height:44px}
+#sliderWrap{flex:1;position:relative;height:52px}
 #timeSlider{-webkit-appearance:none;appearance:none;width:100%;height:6px;background:#1a2a4a;border-radius:3px;outline:none;cursor:pointer;position:absolute;top:50%;transform:translateY(-50%)}
 #timeSlider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;background:#4a8ad0;border:1px solid #6aaaf0;cursor:pointer}
 #timeSlider::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#4a8ad0;border:1px solid #6aaaf0;cursor:pointer}
@@ -59,41 +59,44 @@ input[type=range].inlineSlider::-moz-range-thumb{width:14px;height:14px;border-r
   <div id="sliderRow">
     <label id="lblMin" title="Click to set range start">2024-01-01</label>
     <button class="btn" id="btnPrevST" title="Previous solstice/equinox" style="min-width:26px;padding:0 4px">←</button>
+    <button class="btn" id="btnNextST" title="Next solstice/equinox" style="min-width:26px;padding:0 4px">→</button>
     <div id="sliderWrap">
       <canvas id="sliderCanvas"></canvas>
-      <input type="range" id="timeSlider" min="0" max="1825" value="0"/>
+      <input type="range" id="timeSlider" min="0" max="1825" step="any" value="0"/>
     </div>
-    <button class="btn" id="btnNextST" title="Next solstice/equinox" style="min-width:26px;padding:0 4px">→</button>
     <label id="lblMax" title="Click to set range end">2029-01-01</label>
   </div>
 
   <!-- Toolbar -->
   <div id="toolbar">
     <button class="btn" id="btnPlay" title="Play / Pause">▶</button>
+    <input type="range" class="inlineSlider" id="speedSlider" min="1" max="10" value="10" style="width:60px" title="Playback speed"/>
+    <span class="valLbl" id="lblSpeed" style="min-width:28px">1.0×</span>
     <button class="btn" id="btnNow"  title="Jump to today">⦿</button>
     <button class="btn" id="btnPick" title="Pick date">📅</button>
+    <button class="btn" id="btnMusic" title="Ambient music">♪</button>
     <button class="btn" id="btnSettings" title="Settings">⚙</button>
-    <div class="sep"></div>
-    <span class="lbl" id="lblZoomText">Zoom:</span>
-    <input type="range" class="inlineSlider" id="zoomSlider" min="100" max="2500" value="100" style="width:120px" title="Zoom"/>
-    <span class="valLbl" id="lblZoom">1.00×</span>
-    <div class="sep"></div>
-    <button class="btn" id="btnZodiac"   title="Toggle zodiac ring"    >♈</button>
-    <button class="btn active" id="btnEven"    title="Equal orbit spacing"  >≡</button>
     <button class="btn" id="btnGeo"     title="Earth-centric view"    >♁</button>
+    <button class="btn active" id="btnEven"    title="Equal orbit spacing"  >≡</button>
+    <button class="btn" id="btnZodiac"   title="Toggle zodiac ring"    >♈</button>
     <button class="btn" id="btnSectors" title="Zodiac sector wedges"  style="display:none">☸</button>
     <button class="btn" id="btnTrail"   title="Geocentric trails"     >⇌</button>
     <button class="btn" id="btnInfo"    title="Planet info panel"     >ⓘ</button>
     <div class="sep"></div>
     <span class="lbl">Align:</span>
     <button class="btn" id="btnPrevAlign" title="Previous alignment" style="min-width:26px;padding:0 4px">◄</button>
-    <span class="valLbl" id="lblAlignCount" style="min-width:24px;text-align:center;font-size:9pt">0</span>
     <button class="btn" id="btnNextAlign" title="Next alignment"     style="min-width:26px;padding:0 4px">►</button>
+    <span class="valLbl" id="lblAlignCount" style="min-width:24px;text-align:center;font-size:9pt">0</span>
     <button class="btn active" id="btnMarks" title="Toggle alignment marks">●</button>
     <div class="sep"></div>
     <span class="lbl" title="Planet size scale">⊕</span>
     <input type="range" class="inlineSlider" id="planetSlider" min="25" max="400" value="100" style="width:90px" title="Planet size"/>
     <span class="valLbl" id="lblPlanet">1.00×</span>
+    <div class="sep"></div>
+    <span class="lbl" id="lblZoomText">Zoom:</span>
+    <input type="range" class="inlineSlider" id="zoomSlider" min="100" max="2500" value="100" style="width:120px" title="Zoom"/>
+    <span class="valLbl" id="lblZoom">1.00×</span>
+    <div class="sep"></div>
   </div>
 </div>
 
@@ -107,6 +110,23 @@ input[type=range].inlineSlider::-moz-range-thumb{width:14px;height:14px;border-r
     <input type="range" class="inlineSlider" id="settZFont" min="50" max="200" value="100" style="width:100%"/>
     <div style="color:#80a0c0;font-size:9pt;margin-top:-6px;margin-bottom:8px">
       <span id="settZFontVal">100</span>%
+    </div>
+    <label>Month label font size:</label>
+    <input type="range" class="inlineSlider" id="settMFont" min="50" max="200" value="100" style="width:100%"/>
+    <div style="color:#80a0c0;font-size:9pt;margin-top:-6px;margin-bottom:8px">
+      <span id="settMFontVal">100</span>%
+    </div>
+    <label>Background stars:</label>
+    <div style="display:grid;grid-template-columns:auto 1fr auto;gap:4px 8px;align-items:center;margin-bottom:10px">
+      <span style="font-size:9pt;color:#80a0c0">Density</span>
+      <input type="range" class="inlineSlider" id="settStarDensity" min="50" max="80000" value="280" style="width:100%"/>
+      <span id="settStarDensityVal" style="font-size:9pt;color:#a0c0e8;min-width:30px">280</span>
+      <span style="font-size:9pt;color:#80a0c0">Size</span>
+      <input type="range" class="inlineSlider" id="settStarSize" min="25" max="300" value="100" style="width:100%"/>
+      <span id="settStarSizeVal" style="font-size:9pt;color:#a0c0e8;min-width:30px">100%</span>
+      <span style="font-size:9pt;color:#80a0c0">Opacity</span>
+      <input type="range" class="inlineSlider" id="settStarOpacity" min="10" max="200" value="100" style="width:100%"/>
+      <span id="settStarOpacityVal" style="font-size:9pt;color:#a0c0e8;min-width:30px">100%</span>
     </div>
     <label>Min planets for alignment marks:</label>
     <input type="number" id="settMinAlign" min="3" max="8" value="3" style="width:70px"/>
@@ -143,12 +163,12 @@ input[type=range].inlineSlider::-moz-range-thumb{width:14px;height:14px;border-r
 // ─────────────────────────────────────────────────────────────────────────────
 const J2000 = new Date('2000-01-01T00:00:00Z');
 function daysSinceJ2000(d){
-  return Math.round((d - J2000)/86400000);
+  // return fractional days for sub-day orbital precision
+  return (d - J2000)/86400000;
 }
 function dateFromOffset(baseDate, offset){
-  const d = new Date(baseDate.getTime());
-  d.setDate(d.getDate() + offset);
-  return d;
+  // offset in fractional days → use ms for sub-day precision
+  return new Date(baseDate.getTime() + offset * 86400000);
 }
 function dateToISO(d){
   return d.toISOString().slice(0,10);
@@ -181,17 +201,17 @@ const MOONS={
     {name:'Deimos',  period:1.263,  dist_fac:8.5, au:0.000157,size:1.5,color:'#96826e',mean_lon:120},
   ],
   Jupiter:[
-    {name:'Io',      period:1.769,  dist_fac:5.5, au:0.002819,size:2.0,color:'#dcb450',mean_lon:0},
-    {name:'Europa',  period:3.551,  dist_fac:7.5, au:0.004486,size:1.8,color:'#c8beaa',mean_lon:90},
-    {name:'Ganymede',period:7.155,  dist_fac:10.5,au:0.007155,size:2.5,color:'#a09682',mean_lon:180},
-    {name:'Callisto',period:16.690, dist_fac:14.5,au:0.012588,size:2.2,color:'#786e64',mean_lon:270},
+    {name:'Io',      period:1.769,  dist_fac:4.0, au:0.002819,size:2.0,color:'#dcb450',mean_lon:0},
+    {name:'Europa',  period:3.551,  dist_fac:5.5, au:0.004486,size:1.8,color:'#c8beaa',mean_lon:90},
+    {name:'Ganymede',period:7.155,  dist_fac:7.5, au:0.007155,size:2.5,color:'#a09682',mean_lon:180},
+    {name:'Callisto',period:16.690, dist_fac:10.0,au:0.012588,size:2.2,color:'#786e64',mean_lon:270},
   ],
   Saturn:[
-    {name:'Enceladus',period:1.370, dist_fac:6.5, au:0.001592,size:1.5,color:'#e6e6f0',mean_lon:0},
-    {name:'Tethys',  period:1.888,  dist_fac:8.5, au:0.001971,size:1.8,color:'#d2d2dc',mean_lon:72},
-    {name:'Dione',   period:2.737,  dist_fac:11.0,au:0.002524,size:1.8,color:'#c8c8d2',mean_lon:144},
-    {name:'Rhea',    period:4.518,  dist_fac:13.5,au:0.003524,size:2.0,color:'#beb9b4',mean_lon:216},
-    {name:'Titan',   period:15.950, dist_fac:19.0,au:0.008169,size:2.8,color:'#d2aa5a',mean_lon:288},
+    {name:'Enceladus',period:1.370, dist_fac:4.5, au:0.001592,size:1.5,color:'#e6e6f0',mean_lon:0},
+    {name:'Tethys',  period:1.888,  dist_fac:6.0, au:0.001971,size:1.8,color:'#d2d2dc',mean_lon:72},
+    {name:'Dione',   period:2.737,  dist_fac:7.5, au:0.002524,size:1.8,color:'#c8c8d2',mean_lon:144},
+    {name:'Rhea',    period:4.518,  dist_fac:9.5, au:0.003524,size:2.0,color:'#beb9b4',mean_lon:216},
+    {name:'Titan',   period:15.950, dist_fac:13.0,au:0.008169,size:2.8,color:'#d2aa5a',mean_lon:288},
   ],
   Uranus:[
     {name:'Miranda', period:1.414,  dist_fac:5.0, au:0.000865,size:1.5,color:'#aac8d2',mean_lon:0},
@@ -222,6 +242,24 @@ const ZODIAC_NAMES_EN=['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra',
 const ZODIAC_NAMES_UK=['Овен','Телець','Близнюки','Рак','Лев','Діва','Терези','Скорпіон','Стрілець','Козеріг','Водолій','Риби'];
 const MOON_PHASE_SYMBOLS=['🌑','🌒','🌓','🌔','🌕','🌖','🌗','🌘'];
 const MOON_PHASE_NAMES=['New Moon','Waxing Crescent','First Quarter','Waxing Gibbous','Full Moon','Waning Gibbous','Last Quarter','Waning Crescent'];
+const LOCALE={
+  en:{
+    months:['January','February','March','April','May','June','July','August','September','October','November','December'],
+    monthsAbbr:['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+    moonPhaseNames:['New Moon','Waxing Crescent','First Quarter','Waxing Gibbous','Full Moon','Waning Gibbous','Last Quarter','Waning Crescent'],
+    illuminated:'Illuminated',
+    infoPanelLabels:['Orbital period','Radius','Orbital speed','Rotation','Distance (Sun)','Distance (Earth)'],
+    planetNames:{Mercury:'Mercury',Venus:'Venus',Earth:'Earth',Mars:'Mars',Jupiter:'Jupiter',Saturn:'Saturn',Uranus:'Uranus',Neptune:'Neptune'},
+  },
+  uk:{
+    months:['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'],
+    monthsAbbr:['','Січ','Лют','Бер','Кві','Тра','Чер','Лип','Сер','Вер','Жов','Лис','Гру'],
+    moonPhaseNames:['Новий Місяць','Молодий Місяць','Перша Чверть','Прибуваючий','Повний Місяць','Спадаючий','Остання Чверть','Старий Місяць'],
+    illuminated:'Освітленість',
+    infoPanelLabels:['Орбіт. період','Радіус','Орбіт. швидкість','Обертання','Відстань (Сонце)','Відстань (Земля)'],
+    planetNames:{Mercury:'Меркурій',Venus:'Венера',Earth:'Земля',Mars:'Марс',Jupiter:'Юпітер',Saturn:'Сатурн',Uranus:'Уран',Neptune:'Нептун'},
+  },
+};
 const ST_TARGETS=[[0,1],[45,0],[90,2],[135,0],[180,1],[225,0],[270,2],[315,0]];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -244,7 +282,8 @@ function moonPhaseInfo(d){
   const angle=computeMoonPhaseAngle(d);
   const idx=Math.floor((angle+22.5)/45)%8;
   const illum=Math.round((1-Math.cos(angle*Math.PI/180))/2*100);
-  return {symbol:MOON_PHASE_SYMBOLS[idx],name:MOON_PHASE_NAMES[idx],illum,angle};
+  const L=LOCALE[state&&state.lang]||LOCALE.en;
+  return {symbol:MOON_PHASE_SYMBOLS[idx],name:L.moonPhaseNames[idx],illum,angle};
 }
 function lonDiff(a,b){
   let d=(b-a)%360;
@@ -341,6 +380,11 @@ let state={
   selectedPlanet:null,
   playing:false,
   animStep:1,
+  animSpeed:1.0,
+  monthFontScale:1.0,
+  starDensity:280,
+  starSize:1.0,
+  starOpacity:1.0,
   alignmentMarks:[],
   solarTerms:[],
   eventTimeSuffix:null,  // set when snapped to a solar term; shown in date label
@@ -370,6 +414,11 @@ function saveSettings(){
     zodiacFontScale:Math.round(state.zodiacFontScale*100),
     minAlignPlanets:state.minAlignPlanets,
     lang:state.lang,
+    monthFontScale:Math.round(state.monthFontScale*100),
+    starDensity:state.starDensity,
+    starSize:Math.round(state.starSize*100),
+    starOpacity:Math.round(state.starOpacity*100),
+    animSpeed:Math.round(state.animSpeed*10),
   };
   localStorage.setItem(LS_KEY,JSON.stringify(s));
 }
@@ -393,7 +442,12 @@ function loadSettings(){
     if(s.zodiacFontScale!=null) state.zodiacFontScale=s.zodiacFontScale/100;
     if(s.minAlignPlanets!=null) state.minAlignPlanets=s.minAlignPlanets;
     if(s.lang) state.lang=s.lang;
-  }catch(e){}
+    if(s.monthFontScale!=null) state.monthFontScale=s.monthFontScale/100;
+    if(s.starDensity!=null) state.starDensity=s.starDensity;
+    if(s.starSize!=null) state.starSize=s.starSize/100;
+    if(s.starOpacity!=null) state.starOpacity=s.starOpacity/100;
+    if(s.animSpeed!=null) state.animSpeed=s.animSpeed/10;
+  }catch(e){}  
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -415,11 +469,29 @@ function buildStars(w,h){
   // deterministic LCG
   let seed=42;
   function rand(){seed=(seed*1664525+1013904223)&0xffffffff;return(seed>>>0)/4294967296;}
-  for(let i=0;i<280;i++){
+  const count=state.starDensity||280;
+  const sizeScale=state.starSize||1.0;
+  for(let i=0;i<count;i++){
     const x=Math.floor(rand()*w);
     const y=Math.floor(rand()*h);
     const r=rand();
-    arr.push({x,y,a:Math.floor(r*70+20),s:r*1.6});
+    const a=Math.floor(r*70+20);
+    const s=r*1.6*sizeScale;
+    // Stellar colour classes: blue-white, white, yellow-white, orange, red
+    const cr=rand();
+    let sr,sg,sb;
+    if(cr<0.45){        // blue-white (A/B class)
+      sr=200+Math.floor(rand()*30); sg=215+Math.floor(rand()*25); sb=245+Math.floor(rand()*10);
+    } else if(cr<0.68){ // white (F/G class)
+      sr=245+Math.floor(rand()*10); sg=245+Math.floor(rand()*10); sb=240+Math.floor(rand()*15);
+    } else if(cr<0.82){ // yellow-white (G/K class — sun-like)
+      sr=255; sg=230+Math.floor(rand()*22); sb=160+Math.floor(rand()*70);
+    } else if(cr<0.92){ // orange (K class)
+      sr=255; sg=185+Math.floor(rand()*35); sb=100+Math.floor(rand()*60);
+    } else {            // red (M class)
+      sr=255; sg=130+Math.floor(rand()*50); sb=100+Math.floor(rand()*60);
+    }
+    arr.push({x,y,a,s,r:sr,g:sg,b:sb});
   }
   return arr;
 }
@@ -458,10 +530,11 @@ function draw(){
 
   // Stars
   if(!starsCache) starsCache=buildStars(w,h);
+  const starOp=state.starOpacity||1.0;
   for(const s of starsCache){
     ctx.beginPath();
     ctx.arc(s.x,s.y,s.s,0,Math.PI*2);
-    ctx.fillStyle=`rgba(200,210,255,${s.a/255})`;
+    ctx.fillStyle=`rgba(${s.r},${s.g},${s.b},${Math.min(1,s.a/255*starOp)})`;
     ctx.fill();
   }
 
@@ -606,9 +679,10 @@ function drawPlanet(planet,px,py,scale,evenStep){
   drawMoons(planet,px,py);
 
   // Label
+  const _pnL=LOCALE[state.lang]||LOCALE.en;
   ctx.fillStyle=lighten(color,60);
   ctx.font=`10px 'Segoe UI',Arial,sans-serif`;
-  ctx.fillText(planet.name, px+r+3, py-r);
+  ctx.fillText(_pnL.planetNames[planet.name]||planet.name, px+r+3, py-r);
 }
 
 function drawMoons(planet,px,py){
@@ -818,8 +892,8 @@ function offsetToEventTime(fractionalOffset, kind){
 
 function drawDateLabel(w,h){
   const d=state.currentDate;
-  const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
-  const dateTxt=`${months[d.getUTCMonth()]} ${String(d.getUTCDate()).padStart(2,'0')}, ${d.getUTCFullYear()}`;
+  const L=LOCALE[state.lang]||LOCALE.en;
+  const dateTxt=`${L.months[d.getUTCMonth()]} ${String(d.getUTCDate()).padStart(2,'0')}, ${d.getUTCFullYear()}`;
   const timeTxt = state.eventTimeSuffix !== null ? state.eventTimeSuffix : `⏱ ${currentTimeStr()}`;
   const fullTxt=`${dateTxt}  ${timeTxt}`;
   ctx.font=`bold 14px 'Segoe UI',Arial`;
@@ -871,7 +945,7 @@ function drawMoonPhaseOverlay(w,h){
   ctx.fillText(name,tx,by+pad+9);
   ctx.font=`9px 'Segoe UI',Arial`;
   ctx.fillStyle='rgba(150,190,240,0.784)';
-  ctx.fillText(`Illuminated: ${illum}%`,tx,by+pad+29);
+  ctx.fillText(`${(LOCALE[state.lang]||LOCALE.en).illuminated}: ${illum}%`,tx,by+pad+29);
 
   // Bar
   const barY=by+pad+44, barX=tx, barW=Math.min(tw,80), barH=6;
@@ -936,13 +1010,15 @@ function drawInfoPanel(w,h){
     distStr=distKm>=1e6?`${(distKm/1e6).toFixed(2)} M km`:`${Math.round(distKm).toLocaleString()} km`;
   }
 
+  const L=LOCALE[state.lang]||LOCALE.en;
+  const lbl=L.infoPanelLabels;
   const lines=[
-    ['Orbital period',`${planet.period.toFixed(1)} days`],
-    ['Radius',`${planet.radius_km.toLocaleString()} km`],
-    ['Orbital speed',`${planet.orbital_speed_km_s} km/s`],
-    ['Rotation',planet.spin_days<0?`${Math.abs(planet.spin_days).toFixed(3)} d (retro)`:`${planet.spin_days.toFixed(3)} d`],
-    ['Distance (Sun)',`${planet.au.toFixed(2)} AU`],
-    ['Distance (Earth)',distStr],
+    [lbl[0],`${planet.period.toFixed(1)} days`],
+    [lbl[1],`${planet.radius_km.toLocaleString()} km`],
+    [lbl[2],`${planet.orbital_speed_km_s} km/s`],
+    [lbl[3],planet.spin_days<0?`${Math.abs(planet.spin_days).toFixed(3)} d (retro)`:`${planet.spin_days.toFixed(3)} d`],
+    [lbl[4],`${planet.au.toFixed(2)} AU`],
+    [lbl[5],distStr],
   ];
 
   const pad=14, lineH=26, titleH=30;
@@ -956,9 +1032,10 @@ function drawInfoPanel(w,h){
   ctx.strokeStyle=`rgba(${r},${g},${b},0.706)`; ctx.lineWidth=1.5; ctx.stroke();
 
   ctx.textAlign='left'; ctx.textBaseline='middle';
+  const _ipL=LOCALE[state.lang]||LOCALE.en;
   ctx.font=`bold 14px 'Segoe UI',Arial`;
   ctx.fillStyle=lighten(planet.color,55);
-  ctx.fillText(planet.name,px0+pad,py0+pad+titleH/2);
+  ctx.fillText((_ipL.planetNames[planet.name]||planet.name),px0+pad,py0+pad+titleH/2);
 
   const sepY=py0+pad+titleH;
   ctx.beginPath(); ctx.moveTo(px0+pad,sepY); ctx.lineTo(px0+panelW-pad,sepY);
@@ -1024,6 +1101,26 @@ function drawSliderOverlay(){
     sctx.fillText(ST_SYMBOLS[st.kind],x,gy-tkH-1);
   }
 
+  // Day sub-ticks — scale step by pixel density
+  const nDaysTotal=Math.round((state.sliderMax-state.sliderMin)/86400000);
+  const pixPerDay=gw/Math.max(1,nDaysTotal);
+  const dayStep=pixPerDay>=8?1:pixPerDay>=3?3:pixPerDay>=1.5?7:pixPerDay>=0.8?14:pixPerDay>=0.4?30:0;
+  if(dayStep>0){
+    let dd=new Date(state.sliderMin.getTime());
+    dd=new Date(dd.getTime()+86400000); // skip day 0
+    const dMaxT=state.sliderMax.getTime();
+    while(dd.getTime()<=dMaxT){
+      const dayOff=Math.round((dd.getTime()-state.sliderMin.getTime())/86400000);
+      if(dayOff%dayStep===0&&dd.getUTCDate()!==1){
+        const fx=Math.round(gx+dayOff/total*gw);
+        sctx.strokeStyle='rgba(80,120,180,0.45)'; sctx.lineWidth=0.8;
+        const th=dayStep<=1?3:dayStep<=7?2:1.5;
+        sctx.beginPath(); sctx.moveTo(fx,gy-th); sctx.lineTo(fx,gy+th); sctx.stroke();
+      }
+      dd=new Date(dd.getTime()+86400000);
+    }
+  }
+
   // Year/month ticks
   const dMin=state.sliderMin;
   const dMax=state.sliderMax;
@@ -1040,22 +1137,22 @@ function drawSliderOverlay(){
       const offset=Math.round((tickD-dMin)/86400000);
       const x=Math.round(gx+offset/total*gw);
       if(mo===1){
-        sctx.strokeStyle='rgba(160,200,255,0.784)'; sctx.lineWidth=1.2;
-        sctx.beginPath(); sctx.moveTo(x,gy-9); sctx.lineTo(x,gy+9); sctx.stroke();
-        sctx.fillStyle='rgba(160,200,255,0.863)';
-        sctx.font=`bold 7px 'Segoe UI',Arial`;
+        sctx.strokeStyle='rgba(180,215,255,0.92)'; sctx.lineWidth=1.5;
+        sctx.beginPath(); sctx.moveTo(x,gy-13); sctx.lineTo(x,gy+13); sctx.stroke();
+        sctx.fillStyle='rgba(180,215,255,0.95)';
+        sctx.font=`bold ${Math.max(6,Math.round(8*state.monthFontScale))}px 'Segoe UI',Arial`;
         sctx.textAlign='center'; sctx.textBaseline='alphabetic';
-        sctx.fillText(String(yr),x,gy-10);
+        sctx.fillText(String(yr),x,gy-15);
       } else {
         const showLbl=showAllMonths||(showQtrMonths&&[4,7,10].includes(mo));
-        sctx.strokeStyle='rgba(100,140,200,0.51)'; sctx.lineWidth=0.8;
-        sctx.beginPath(); sctx.moveTo(x,gy-4); sctx.lineTo(x,gy+4); sctx.stroke();
+        sctx.strokeStyle='rgba(110,155,220,0.72)'; sctx.lineWidth=1.0;
+        sctx.beginPath(); sctx.moveTo(x,gy-7); sctx.lineTo(x,gy+7); sctx.stroke();
         if(showLbl){
-          const ABBR=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-          sctx.fillStyle='rgba(120,160,210,0.706)';
-          sctx.font=`6px 'Segoe UI',Arial`;
+          const ABBR=(LOCALE[state.lang]||LOCALE.en).monthsAbbr;
+          sctx.fillStyle='rgba(130,170,225,0.88)';
+          sctx.font=`${Math.max(6,Math.round(7*state.monthFontScale))}px 'Segoe UI',Arial`;
           sctx.textAlign='center'; sctx.textBaseline='top';
-          sctx.fillText(ABBR[mo],x,gy+5);
+          sctx.fillText(ABBR[mo],x,gy+8);
         }
       }
     }
@@ -1105,13 +1202,17 @@ function syncAllUI(){
   setBtn('btnTrail',state.showTrail);
   setBtn('btnInfo',state.showInfo);
   setBtn('btnMarks',state.showMarks);
-  // Zodiac & sector buttons only in geo mode
+  // Zodiac & sector & trail buttons only in geo mode
   document.getElementById('btnZodiac').style.display=state.geoMode?'':'none';
   document.getElementById('btnSectors').style.display=state.geoMode?'':'none';
+  document.getElementById('btnTrail').style.display=state.geoMode?'':'none';
   // Zoom slider hidden in even mode
   document.getElementById('zoomSlider').style.display=state.evenMode?'none':'';
   document.getElementById('lblZoom').style.display=state.evenMode?'none':'';
   document.getElementById('lblZoomText').style.display=state.evenMode?'none':'';
+  // Speed slider
+  document.getElementById('speedSlider').value=Math.round(state.animSpeed*10);
+  document.getElementById('lblSpeed').textContent=state.animSpeed.toFixed(1)+'×';
   // Alignment count
   document.getElementById('lblAlignCount').textContent=state.alignmentMarks.length;
 }
@@ -1142,7 +1243,7 @@ cv.addEventListener('click',e=>{
 
 // Slider
 document.getElementById('timeSlider').addEventListener('input',e=>{
-  const offset=parseInt(e.target.value);
+  const offset=parseFloat(e.target.value);
   state.currentDate=dateFromOffset(state.sliderMin,offset);
   state.eventTimeSuffix=null;  // manual drag clears event time
   draw();
@@ -1166,27 +1267,99 @@ document.getElementById('planetSlider').addEventListener('input',e=>{
 
 // Play
 let animTimer=null;
+let animLastTime=null;
+function tickPlay(ts){
+  if(!state.playing) return;
+  if(animLastTime===null) animLastTime=ts;
+  const dt=Math.min(ts-animLastTime,100); // cap to avoid jump after tab switch
+  animLastTime=ts;
+  const slider=document.getElementById('timeSlider');
+  const total=parseInt(slider.max)||1;
+  // 1.0× speed = 1 day per 40ms; fractional advance for smooth motion
+  let v=parseFloat(slider.value)+dt/40*state.animSpeed;
+  if(v>total) v=0;
+  slider.value=v;
+  state.currentDate=dateFromOffset(state.sliderMin,v);
+  draw();
+  animTimer=requestAnimationFrame(tickPlay);
+}
 document.getElementById('btnPlay').addEventListener('click',()=>{
   if(animTimer){
-    clearInterval(animTimer);
+    cancelAnimationFrame(animTimer);
     animTimer=null;
+    animLastTime=null;
     state.playing=false;
     document.getElementById('btnPlay').textContent='▶';
   } else {
     state.playing=true;
     document.getElementById('btnPlay').textContent='⏸';
-    animTimer=setInterval(()=>{
-      const slider=document.getElementById('timeSlider');
-      const total=parseInt(slider.max)||1;
-      let v=parseInt(slider.value)+state.animStep;
-      if(v>total) v=0;
-      slider.value=v;
-      state.currentDate=dateFromOffset(state.sliderMin,v);
-      draw();
-    },40);
+    animLastTime=null;
+    animTimer=requestAnimationFrame(tickPlay);
   }
 });
 
+// Speed
+document.getElementById('speedSlider').addEventListener('input',e=>{
+  state.animSpeed=parseInt(e.target.value)/10;
+  document.getElementById('lblSpeed').textContent=state.animSpeed.toFixed(1)+'×';
+  // no timer restart needed — rAF loop reads state.animSpeed each frame
+  saveSettings();
+});
+
+// YouTube music player
+let ytPlayer=null;
+let ytApiReady=false;
+window.onYouTubeIframeAPIReady=function(){ ytApiReady=true; };
+
+function loadYouTubeAPI(){
+  if(document.getElementById('ytApiScript')) return;
+  const s=document.createElement('script');
+  s.id='ytApiScript';
+  s.src='https://www.youtube.com/iframe_api';
+  document.head.appendChild(s);
+}
+function startYTMusic(){
+  // Tiny off-screen container so Audio policy accepts it
+  let wrap=document.getElementById('ytWrap');
+  if(!wrap){
+    wrap=document.createElement('div');
+    wrap.id='ytWrap';
+    wrap.style.cssText='position:fixed;bottom:0;right:0;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;';
+    const inner=document.createElement('div');
+    inner.id='ytPlayerEl';
+    wrap.appendChild(inner);
+    document.body.appendChild(wrap);
+  }
+  ytPlayer=new YT.Player('ytPlayerEl',{
+    height:'1',width:'1',
+    videoId:'Y3B_cNyFOSc',
+    playerVars:{autoplay:1,loop:1,playlist:'Y3B_cNyFOSc',
+                controls:0,disablekb:1,fs:0,iv_load_policy:3,modestbranding:1,rel:0,mute:0},
+    events:{onReady:e=>{ e.target.unMute(); e.target.setVolume(80); e.target.playVideo(); }}
+  });
+}
+function stopYTMusic(){
+  if(ytPlayer){ try{ ytPlayer.stopVideo(); ytPlayer.destroy(); }catch(e){} ytPlayer=null; }
+  const w=document.getElementById('ytWrap'); if(w){ w.remove(); }
+  // re-create placeholder so YT API can target it next time
+}
+document.getElementById('btnMusic').addEventListener('click',()=>{
+  const btn=document.getElementById('btnMusic');
+  if(ytPlayer){
+    stopYTMusic();
+    btn.textContent='♪';
+    btn.classList.remove('active');
+  } else {
+    btn.textContent='🔇';
+    btn.classList.add('active');
+    loadYouTubeAPI();
+    const tryStart=()=>{
+      if(ytApiReady){ startYTMusic(); }
+      else { setTimeout(tryStart,150); }
+    };
+    tryStart();
+  }
+});
 // Now
 document.getElementById('btnNow').addEventListener('click',()=>{
   const d=today();
@@ -1232,6 +1405,7 @@ function toggleBtn(id,key){
     if(id==='btnGeo'){
       document.getElementById('btnZodiac').style.display=state.geoMode?'':'none';
       document.getElementById('btnSectors').style.display=state.geoMode?'':'none';
+      document.getElementById('btnTrail').style.display=state.geoMode?'':'none';
     }
     if(id==='btnEven'){
       document.getElementById('zoomSlider').style.display=state.evenMode?'none':'';
@@ -1266,10 +1440,11 @@ document.getElementById('btnPrevST').addEventListener('click',()=>{
 });
 document.getElementById('btnNextST').addEventListener('click',()=>{
   const slider=document.getElementById('timeSlider');
-  const curOffset=parseFloat(slider.value)+0.01;
+  // Use current integer day + 1 so repeated presses always advance past the snapped day
+  const curOffset=Math.floor(parseFloat(slider.value))+1;
   let best=null;
   for(const st of state.solarTerms){
-    if(st.offset>curOffset&&(best===null||st.offset<best.offset)) best=st;
+    if(st.offset>=curOffset&&(best===null||st.offset<best.offset)) best=st;
   }
   if(best){
     slider.value=Math.floor(best.offset);
@@ -1282,24 +1457,26 @@ document.getElementById('btnNextST').addEventListener('click',()=>{
 // Alignment nav
 document.getElementById('btnPrevAlign').addEventListener('click',()=>{
   const slider=document.getElementById('timeSlider');
-  const cur=parseInt(slider.value);
-  const prev=state.alignmentMarks.filter(m=>m.offset<cur);
+  const cur=parseFloat(slider.value);
+  const prev=state.alignmentMarks.filter(m=>m.offset<cur-0.5);
   if(prev.length){
-    slider.value=prev[prev.length-1].offset;
-    state.currentDate=dateFromOffset(state.sliderMin,prev[prev.length-1].offset);
+    const mark=prev[prev.length-1];
+    slider.value=mark.offset;
+    state.currentDate=dateFromOffset(state.sliderMin,mark.offset);
     state.eventTimeSuffix=null;
-    draw(); saveSettings();
+    draw(); drawSliderOverlay(); saveSettings();
   }
 });
 document.getElementById('btnNextAlign').addEventListener('click',()=>{
   const slider=document.getElementById('timeSlider');
-  const cur=parseInt(slider.value);
-  const nxt=state.alignmentMarks.filter(m=>m.offset>cur);
+  const cur=parseFloat(slider.value);
+  const nxt=state.alignmentMarks.filter(m=>m.offset>cur+0.5);
   if(nxt.length){
-    slider.value=nxt[0].offset;
-    state.currentDate=dateFromOffset(state.sliderMin,nxt[0].offset);
+    const mark=nxt[0];
+    slider.value=mark.offset;
+    state.currentDate=dateFromOffset(state.sliderMin,mark.offset);
     state.eventTimeSuffix=null;
-    draw(); saveSettings();
+    draw(); drawSliderOverlay(); saveSettings();
   }
 });
 
@@ -1320,6 +1497,14 @@ document.getElementById('btnSettings').addEventListener('click',()=>{
   document.getElementById('settLang').value=state.lang;
   document.getElementById('settZFont').value=Math.round(state.zodiacFontScale*100);
   document.getElementById('settZFontVal').textContent=Math.round(state.zodiacFontScale*100);
+  document.getElementById('settMFont').value=Math.round(state.monthFontScale*100);
+  document.getElementById('settMFontVal').textContent=Math.round(state.monthFontScale*100);
+  document.getElementById('settStarDensity').value=state.starDensity;
+  document.getElementById('settStarDensityVal').textContent=state.starDensity;
+  document.getElementById('settStarSize').value=Math.round(state.starSize*100);
+  document.getElementById('settStarSizeVal').textContent=Math.round(state.starSize*100)+'%';
+  document.getElementById('settStarOpacity').value=Math.round(state.starOpacity*100);
+  document.getElementById('settStarOpacityVal').textContent=Math.round(state.starOpacity*100)+'%';
   document.getElementById('settMinAlign').value=state.minAlignPlanets;
   document.getElementById('settDateMin').value=dateToISO(state.sliderMin);
   document.getElementById('settDateMax').value=dateToISO(state.sliderMax);
@@ -1329,6 +1514,18 @@ document.getElementById('btnSettings').addEventListener('click',()=>{
 });
 document.getElementById('settZFont').addEventListener('input',e=>{
   document.getElementById('settZFontVal').textContent=e.target.value;
+});
+document.getElementById('settMFont').addEventListener('input',e=>{
+  document.getElementById('settMFontVal').textContent=e.target.value;
+});
+document.getElementById('settStarDensity').addEventListener('input',e=>{
+  document.getElementById('settStarDensityVal').textContent=e.target.value;
+});
+document.getElementById('settStarSize').addEventListener('input',e=>{
+  document.getElementById('settStarSizeVal').textContent=e.target.value+'%';
+});
+document.getElementById('settStarOpacity').addEventListener('input',e=>{
+  document.getElementById('settStarOpacityVal').textContent=e.target.value+'%';
 });
 document.getElementById('settOk').addEventListener('click',()=>{
   const errEl=document.getElementById('settDateErr');
@@ -1343,6 +1540,14 @@ document.getElementById('settOk').addEventListener('click',()=>{
   if(newDateMax<=newDateMin){errEl.textContent='End date must be after start date';return;}
   state.lang=document.getElementById('settLang').value;
   state.zodiacFontScale=parseInt(document.getElementById('settZFont').value)/100;
+  state.monthFontScale=parseInt(document.getElementById('settMFont').value)/100;
+  const newStarDensity=parseInt(document.getElementById('settStarDensity').value);
+  const newStarSize=parseInt(document.getElementById('settStarSize').value)/100;
+  const newStarOpacity=parseInt(document.getElementById('settStarOpacity').value)/100;
+  if(newStarDensity!==state.starDensity||newStarSize!==state.starSize||newStarOpacity!==state.starOpacity){
+    state.starDensity=newStarDensity; state.starSize=newStarSize; state.starOpacity=newStarOpacity;
+    starsCache=null; // force rebuild
+  }
   const newMin2=parseInt(document.getElementById('settMinAlign').value);
   if(!isNaN(newMin2)&&newMin2>=3&&newMin2<=8) state.minAlignPlanets=newMin2;
   if(newDateMin.getTime()!==state.sliderMin.getTime()||newDateMax.getTime()!==state.sliderMax.getTime()){
