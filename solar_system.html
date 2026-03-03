@@ -70,18 +70,21 @@ input[type=range].inlineSlider::-moz-range-thumb{width:14px;height:14px;border-r
   <!-- Toolbar -->
   <div id="toolbar">
     <button class="btn" id="btnPlay" title="Play / Pause">▶</button>
-    <input type="range" class="inlineSlider" id="speedSlider" min="1" max="10" value="10" style="width:60px" title="Playback speed"/>
+    <input type="range" class="inlineSlider" id="speedSlider" min="1" max="100" value="10" style="width:100px" title="Playback speed"/>
     <span class="valLbl" id="lblSpeed" style="min-width:28px">1.0×</span>
     <button class="btn" id="btnNow"  title="Jump to today">⦿</button>
     <button class="btn" id="btnPick" title="Pick date">📅</button>
     <button class="btn" id="btnMusic" title="Ambient music">♪</button>
+    <input type="range" class="inlineSlider" id="volSlider" min="0" max="100" value="80" title="Music volume" style="width:64px"/>
     <button class="btn" id="btnSettings" title="Settings">⚙</button>
-    <button class="btn" id="btnGeo"     title="Earth-centric view"    >♁</button>
     <button class="btn active" id="btnEven"    title="Equal orbit spacing"  >≡</button>
+    <button class="btn" id="btnGeo"     title="Earth-centric view"    >♁</button>
     <button class="btn" id="btnZodiac"   title="Toggle zodiac ring"    >♈</button>
     <button class="btn" id="btnSectors" title="Zodiac sector wedges"  style="display:none">☸</button>
     <button class="btn" id="btnTrail"   title="Geocentric trails"     >⇌</button>
     <button class="btn" id="btnInfo"    title="Planet info panel"     >ⓘ</button>
+    <button class="btn" id="btnSunLight" title="Sun lighting &amp; shadow">◑</button>
+    <button class="btn" id="btnGeoLines" title="Geographic grid + rotation">⊞</button>
     <div class="sep"></div>
     <span class="lbl">Align:</span>
     <button class="btn" id="btnPrevAlign" title="Previous alignment" style="min-width:26px;padding:0 4px">◄</button>
@@ -92,6 +95,12 @@ input[type=range].inlineSlider::-moz-range-thumb{width:14px;height:14px;border-r
     <span class="lbl" title="Planet size scale">⊕</span>
     <input type="range" class="inlineSlider" id="planetSlider" min="25" max="400" value="100" style="width:90px" title="Planet size"/>
     <span class="valLbl" id="lblPlanet">1.00×</span>
+    <span class="lbl" title="Sun size scale">☀</span>
+    <input type="range" class="inlineSlider" id="sunSlider" min="25" max="400" value="100" style="width:70px" title="Sun size"/>
+    <span class="valLbl" id="lblSun">1.00×</span>
+    <span class="lbl" title="Moon size scale">☽</span>
+    <input type="range" class="inlineSlider" id="moonSlider" min="25" max="400" value="100" style="width:70px" title="Moon size"/>
+    <span class="valLbl" id="lblMoon">1.00×</span>
     <div class="sep"></div>
     <span class="lbl" id="lblZoomText">Zoom:</span>
     <input type="range" class="inlineSlider" id="zoomSlider" min="100" max="2500" value="100" style="width:120px" title="Zoom"/>
@@ -103,36 +112,54 @@ input[type=range].inlineSlider::-moz-range-thumb{width:14px;height:14px;border-r
 <!-- Settings modal -->
 <div class="modal-overlay" id="settingsModal">
   <div class="modal">
-    <h2>⚙ Settings</h2>
-    <label>Language:</label>
+    <h2 id="settTitle">⚙ Settings</h2>
+    <label id="settLblLang">Language:</label>
     <select id="settLang"><option value="en">English</option><option value="uk">Українська</option></select>
-    <label>Zodiac font size:</label>
+    <label id="settLblZFont">Zodiac font size:</label>
     <input type="range" class="inlineSlider" id="settZFont" min="50" max="200" value="100" style="width:100%"/>
     <div style="color:#80a0c0;font-size:9pt;margin-top:-6px;margin-bottom:8px">
       <span id="settZFontVal">100</span>%
     </div>
-    <label>Month label font size:</label>
+    <label id="settLblMFont">Month label font size:</label>
     <input type="range" class="inlineSlider" id="settMFont" min="50" max="200" value="100" style="width:100%"/>
     <div style="color:#80a0c0;font-size:9pt;margin-top:-6px;margin-bottom:8px">
       <span id="settMFontVal">100</span>%
     </div>
-    <label>Background stars:</label>
+    <label id="settLblWidgetFont">Widget font size:</label>
+    <input type="range" class="inlineSlider" id="settWidgetFont" min="50" max="200" value="100" style="width:100%"/>
+    <div style="color:#80a0c0;font-size:9pt;margin-top:-6px;margin-bottom:8px">
+      <span id="settWidgetFontVal">100</span>%
+    </div>
+    <label id="settLblGeoLineW">Geo grid line width &amp; color:</label>
+    <div style="display:grid;grid-template-columns:1fr auto auto;gap:4px 8px;align-items:center;margin-bottom:4px">
+      <input type="range" class="inlineSlider" id="settGeoLineW" min="1" max="40" value="10" style="width:100%"/>
+      <span id="settGeoLineWVal" style="font-size:9pt;color:#a0c0e8;min-width:36px">1.0</span>
+      <input type="color" id="settGeoLineColor" value="#64b4ff" style="width:32px;height:24px;border:none;background:none;cursor:pointer;padding:0"/>
+    </div>
+    <label id="settLblGeoLineDensity">Geo grid line density <span id="settLblGeoLineDensityHint" style="color:#5a9ad0;font-size:8pt">(degrees between lines)</span>:</label>
+    <div style="display:grid;grid-template-columns:1fr auto;gap:4px 8px;align-items:center;margin-bottom:10px">
+      <input type="range" class="inlineSlider" id="settGeoLineDensity" min="10" max="90" step="5" value="30" style="width:100%"/>
+      <span id="settGeoLineDensityVal" style="font-size:9pt;color:#a0c0e8;min-width:36px">30°</span>
+    </div>
+    <label id="settLblMusic">Background music <span id="settLblMusicHint" style="color:#5a9ad0;font-size:8pt">(YouTube URL or video ID)</span>:</label>
+    <input type="text" id="settMusicUrl" placeholder="Y3B_cNyFOSc or https://youtu.be/..." autocomplete="off" spellcheck="false" style="margin-bottom:10px"/>
+    <label id="settLblStars">Background stars:</label>
     <div style="display:grid;grid-template-columns:auto 1fr auto;gap:4px 8px;align-items:center;margin-bottom:10px">
-      <span style="font-size:9pt;color:#80a0c0">Density</span>
+      <span id="settLblDensity" style="font-size:9pt;color:#80a0c0">Density</span>
       <input type="range" class="inlineSlider" id="settStarDensity" min="50" max="80000" value="280" style="width:100%"/>
       <span id="settStarDensityVal" style="font-size:9pt;color:#a0c0e8;min-width:30px">280</span>
-      <span style="font-size:9pt;color:#80a0c0">Size</span>
+      <span id="settLblSize" style="font-size:9pt;color:#80a0c0">Size</span>
       <input type="range" class="inlineSlider" id="settStarSize" min="25" max="300" value="100" style="width:100%"/>
       <span id="settStarSizeVal" style="font-size:9pt;color:#a0c0e8;min-width:30px">100%</span>
-      <span style="font-size:9pt;color:#80a0c0">Opacity</span>
+      <span id="settLblOpacity" style="font-size:9pt;color:#80a0c0">Opacity</span>
       <input type="range" class="inlineSlider" id="settStarOpacity" min="10" max="200" value="100" style="width:100%"/>
       <span id="settStarOpacityVal" style="font-size:9pt;color:#a0c0e8;min-width:30px">100%</span>
     </div>
-    <label>Min planets for alignment marks:</label>
+    <label id="settLblMinAlign">Min planets for alignment marks:</label>
     <input type="number" id="settMinAlign" min="3" max="8" value="3" style="width:70px"/>
-    <label style="margin-top:6px">Slider start date: <span style="color:#5a9ad0;font-size:8pt">(YYYY-MM-DD)</span></label>
+    <label id="settLblDateMin" style="margin-top:6px">Slider start date: <span id="settLblDateHint" style="color:#5a9ad0;font-size:8pt">(YYYY-MM-DD)</span></label>
     <input type="text" id="settDateMin" placeholder="2024-01-01" maxlength="10" autocomplete="off" spellcheck="false"/>
-    <label>Slider end date: <span style="color:#5a9ad0;font-size:8pt">(YYYY-MM-DD)</span></label>
+    <label id="settLblDateMax">Slider end date: <span id="settLblDateHintMax" style="color:#5a9ad0;font-size:8pt">(YYYY-MM-DD)</span></label>
     <input type="text" id="settDateMax" placeholder="2029-01-01" maxlength="10" autocomplete="off" spellcheck="false"/>
     <div id="settDateErr" style="color:#f07070;font-size:8pt;min-height:16px;margin-top:-6px"></div>
     <div class="row">
@@ -145,8 +172,8 @@ input[type=range].inlineSlider::-moz-range-thumb{width:14px;height:14px;border-r
 <!-- Date picker modal -->
 <div class="modal-overlay" id="calModal">
   <div class="modal">
-    <h2>📅 Pick Date</h2>
-    <label>Date: <span style="color:#5a9ad0;font-size:8pt">(YYYY-MM-DD)</span></label>
+    <h2 id="calTitle">📅 Pick Date</h2>
+    <label id="calLblDate">Date: <span id="calLblDateHint" style="color:#5a9ad0;font-size:8pt">(YYYY-MM-DD)</span></label>
     <input type="text" id="calInput" style="width:100%" placeholder="2026-03-02" maxlength="10" autocomplete="off" spellcheck="false"/>
     <div id="calErr" style="color:#f07070;font-size:8pt;min-height:14px"></div>
     <div class="row">
@@ -156,6 +183,7 @@ input[type=range].inlineSlider::-moz-range-thumb{width:14px;height:14px;border-r
   </div>
 </div>
 
+<script src="astro_data.js"></script>
 <script>
 'use strict';
 // ─────────────────────────────────────────────────────────────────────────────
@@ -250,6 +278,35 @@ const LOCALE={
     illuminated:'Illuminated',
     infoPanelLabels:['Orbital period','Radius','Orbital speed','Rotation','Distance (Sun)','Distance (Earth)'],
     planetNames:{Mercury:'Mercury',Venus:'Venus',Earth:'Earth',Mars:'Mars',Jupiter:'Jupiter',Saturn:'Saturn',Uranus:'Uranus',Neptune:'Neptune'},
+    zodiacNames:['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'],
+    settingsLabels:{
+      title:'⚙ Settings',
+      lang:'Language:',
+      zodiacFont:'Zodiac font size:',
+      monthFont:'Month label font size:',
+      widgetFont:'Widget font size:',
+      geoLineW:'Geo grid line width & color:',
+      geoLineDensity:'Geo grid line density',
+      geoLineDensityHint:'(degrees between lines)',
+      music:'Background music',
+      musicHint:'(YouTube URL or video ID)',
+      musicVol:'Music volume:',
+      stars:'Background stars:',
+      starsDensity:'Density',
+      starsSize:'Size',
+      starsOpacity:'Opacity',
+      minAlign:'Min planets for alignment marks:',
+      dateMin:'Slider start date:',
+      dateMax:'Slider end date:',
+      dateHint:'(YYYY-MM-DD)',
+      cancel:'Cancel',
+      ok:'OK',
+      calTitle:'📅 Pick Date',
+      calDate:'Date:',
+      errInvalidStart:'Start date invalid — use YYYY-MM-DD',
+      errInvalidEnd:'End date invalid — use YYYY-MM-DD',
+      errDateOrder:'End date must be after start date',
+    },
   },
   uk:{
     months:['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'],
@@ -258,6 +315,35 @@ const LOCALE={
     illuminated:'Освітленість',
     infoPanelLabels:['Орбіт. період','Радіус','Орбіт. швидкість','Обертання','Відстань (Сонце)','Відстань (Земля)'],
     planetNames:{Mercury:'Меркурій',Venus:'Венера',Earth:'Земля',Mars:'Марс',Jupiter:'Юпітер',Saturn:'Сатурн',Uranus:'Уран',Neptune:'Нептун'},
+    zodiacNames:['Овен','Телець','Близнюки','Рак','Лев','Діва','Терези','Скорпіон','Стрілець','Козеріг','Водолій','Риби'],
+    settingsLabels:{
+      title:'⚙ Налаштування',
+      lang:'Мова:',
+      zodiacFont:'Розмір шрифту зодіаку:',
+      monthFont:'Розмір шрифту місяців:',
+      widgetFont:'Розмір шрифту віджетів:',
+      geoLineW:'Товщина та колір ліній сітки:',
+      geoLineDensity:'Щільність ліній сітки',
+      geoLineDensityHint:'(градусів між лініями)',
+      music:'Фонова музика',
+      musicHint:'(URL YouTube або ID відео)',
+      musicVol:'Гучність музики:',
+      stars:'Зорі тла:',
+      starsDensity:'Щільність',
+      starsSize:'Розмір',
+      starsOpacity:'Прозорість',
+      minAlign:'Мін. планет для позначок:',
+      dateMin:'Початкова дата слайдера:',
+      dateMax:'Кінцева дата слайдера:',
+      dateHint:'(РРРР-ММ-ДД)',
+      cancel:'Скасувати',
+      ok:'ОК',
+      calTitle:'📅 Вибрати дату',
+      calDate:'Дата:',
+      errInvalidStart:'Невірна початкова дата — формат РРРР-ММ-ДД',
+      errInvalidEnd:'Невірна кінцева дата — формат РРРР-ММ-ДД',
+      errDateOrder:'Кінцева дата повинна бути пізніше початкової',
+    },
   },
 };
 const ST_TARGETS=[[0,1],[45,0],[90,2],[135,0],[180,1],[225,0],[270,2],[315,0]];
@@ -268,6 +354,19 @@ const ST_TARGETS=[[0,1],[45,0],[90,2],[135,0],[180,1],[225,0],[270,2],[315,0]];
 function planetAngleDeg(planet, d){
   const days=daysSinceJ2000(d);
   return ((planet.mean_lon + 360*days/planet.period) % 360 + 360) % 360;
+}
+/** Geocentric ecliptic longitude (degrees) — for zodiac sign lookup */
+function geoEclLonDeg(planet, d){
+  const earth=PLANETS[2];
+  if(planet.name==='Earth'){
+    // Sun as seen from Earth = Earth heliocentric lon + 180°
+    return ((planetAngleDeg(earth,d)+180)%360+360)%360;
+  }
+  const eAng=planetAngleDeg(earth,d)*Math.PI/180;
+  const pAng=planetAngleDeg(planet,d)*Math.PI/180;
+  const ex=earth.au*Math.cos(eAng), ey=earth.au*Math.sin(eAng);
+  const px=planet.au*Math.cos(pAng), py=planet.au*Math.sin(pAng);
+  return (Math.atan2(py-ey,px-ex)*180/Math.PI%360+360)%360;
 }
 function computeMoonPhaseAngle(d){
   const days=daysSinceJ2000(d);
@@ -358,6 +457,7 @@ function computeSolarTerms(dateMin,dateMax){
 const ST_COLORS=['rgba(180,120,255,0.87)','rgba(80,210,160,0.87)','rgba(255,210,60,0.87)'];
 const ST_SYMBOLS=['◆','⊕','☀'];
 
+
 // ─────────────────────────────────────────────────────────────────────────────
 // STATE
 // ─────────────────────────────────────────────────────────────────────────────
@@ -373,7 +473,17 @@ let state={
   showTrail:false,
   showInfo:false,
   showMarks:true,
+  showSunLight:false,
+  showGeoLines:false,
+  geoLineWidth:1.0,
+  geoLineColor:'#64b4ff',
+  geoLineDensity:30,
+  musicUrl:'Y3B_cNyFOSc',
+  musicOn:true,
+  musicVol:80,
   planetScale:1.0,
+  sunScale:1.0,
+  moonScale:1.0,
   zodiacFontScale:1.0,
   minAlignPlanets:3,
   lang:'en',
@@ -382,6 +492,7 @@ let state={
   animStep:1,
   animSpeed:1.0,
   monthFontScale:1.0,
+  widgetFontScale:1.0,
   starDensity:280,
   starSize:1.0,
   starOpacity:1.0,
@@ -410,11 +521,22 @@ function saveSettings(){
     showTrail:state.showTrail,
     showInfo:state.showInfo,
     showMarks:state.showMarks,
+    showSunLight:state.showSunLight,
+    showGeoLines:state.showGeoLines,
+    geoLineWidth:Math.round(state.geoLineWidth*10),
+    geoLineColor:state.geoLineColor,
+    geoLineDensity:state.geoLineDensity,
+    musicUrl:state.musicUrl,
+    musicOn:state.musicOn,
+    musicVol:state.musicVol,
     planetScale:Math.round(state.planetScale*100),
+    sunScale:Math.round(state.sunScale*100),
+    moonScale:Math.round(state.moonScale*100),
     zodiacFontScale:Math.round(state.zodiacFontScale*100),
     minAlignPlanets:state.minAlignPlanets,
     lang:state.lang,
     monthFontScale:Math.round(state.monthFontScale*100),
+    widgetFontScale:Math.round(state.widgetFontScale*100),
     starDensity:state.starDensity,
     starSize:Math.round(state.starSize*100),
     starOpacity:Math.round(state.starOpacity*100),
@@ -438,16 +560,66 @@ function loadSettings(){
     if(s.showTrail!=null) state.showTrail=!!s.showTrail;
     if(s.showInfo!=null) state.showInfo=!!s.showInfo;
     if(s.showMarks!=null) state.showMarks=!!s.showMarks;
+    if(s.showSunLight!=null) state.showSunLight=!!s.showSunLight;
+    if(s.showGeoLines!=null) state.showGeoLines=!!s.showGeoLines;
+    if(s.geoLineWidth!=null) state.geoLineWidth=s.geoLineWidth/10;
+    if(s.geoLineColor) state.geoLineColor=s.geoLineColor;
+    if(s.geoLineDensity!=null) state.geoLineDensity=s.geoLineDensity;
+    if(s.musicUrl) state.musicUrl=s.musicUrl;
+    if(s.musicOn!=null) state.musicOn=!!s.musicOn;
+    if(s.musicVol!=null) state.musicVol=s.musicVol;
     if(s.planetScale!=null) state.planetScale=s.planetScale/100;
+    if(s.sunScale!=null) state.sunScale=s.sunScale/100;
+    if(s.moonScale!=null) state.moonScale=s.moonScale/100;
     if(s.zodiacFontScale!=null) state.zodiacFontScale=s.zodiacFontScale/100;
     if(s.minAlignPlanets!=null) state.minAlignPlanets=s.minAlignPlanets;
     if(s.lang) state.lang=s.lang;
     if(s.monthFontScale!=null) state.monthFontScale=s.monthFontScale/100;
+    if(s.widgetFontScale!=null) state.widgetFontScale=s.widgetFontScale/100;
     if(s.starDensity!=null) state.starDensity=s.starDensity;
     if(s.starSize!=null) state.starSize=s.starSize/100;
     if(s.starOpacity!=null) state.starOpacity=s.starOpacity/100;
     if(s.animSpeed!=null) state.animSpeed=s.animSpeed/10;
   }catch(e){}  
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SETTINGS LOCALISATION — update UI labels to match chosen language
+// ─────────────────────────────────────────────────────────────────────────────
+function applySettingsLocale(lang){
+  const L=(LOCALE[lang]||LOCALE.en).settingsLabels;
+  if(!L) return;
+  const set=(id,html,useHTML)=>{
+    const e=document.getElementById(id);
+    if(!e) return;
+    if(useHTML) e.innerHTML=html; else e.textContent=html;
+  };
+  set('settTitle', L.title);
+  set('settLblLang', L.lang);
+  set('settLblZFont', L.zodiacFont);
+  set('settLblMFont', L.monthFont);
+  set('settLblWidgetFont', L.widgetFont);
+  set('settLblGeoLineW', L.geoLineW);
+  set('settLblGeoLineDensity',
+    `${L.geoLineDensity} <span id="settLblGeoLineDensityHint" style="color:#5a9ad0;font-size:8pt">${L.geoLineDensityHint}</span>:`, true);
+  set('settLblMusic',
+    `${L.music} <span id="settLblMusicHint" style="color:#5a9ad0;font-size:8pt">${L.musicHint}</span>:`, true);
+  set('settLblStars', L.stars);
+  set('settLblDensity', L.starsDensity);
+  set('settLblSize', L.starsSize);
+  set('settLblOpacity', L.starsOpacity);
+  set('settLblMinAlign', L.minAlign);
+  set('settLblDateMin',
+    `${L.dateMin} <span id="settLblDateHint" style="color:#5a9ad0;font-size:8pt">${L.dateHint}</span>`, true);
+  set('settLblDateMax',
+    `${L.dateMax} <span id="settLblDateHintMax" style="color:#5a9ad0;font-size:8pt">${L.dateHint}</span>`, true);
+  set('settCancel', L.cancel);
+  set('settOk', L.ok);
+  set('calTitle', L.calTitle);
+  set('calLblDate',
+    `${L.calDate} <span id="calLblDateHint" style="color:#5a9ad0;font-size:8pt">${L.dateHint}</span>`, true);
+  set('calCancel', L.cancel);
+  set('calOk', L.ok);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -546,13 +718,14 @@ function draw(){
   const zodiacInner=halfCanvas*0.80;
   const evenStep=zodiacInner/(n+1);
 
+  const geoEvenMode=state.geoMode&&state.evenMode;
   const earth=PLANETS[2];
-  const earthIdx=2;
-  const earthOrbitR=state.evenMode ? evenStep*(earthIdx+1) : earth.au*scale;
+  const earthOrbitR=earth.au*scale; // always real AU for geocentric offset calc
   const earthAngle=planetAngleDeg(earth,state.currentDate)*Math.PI/180;
   const earthHx=earthOrbitR*Math.cos(earthAngle);
   const earthHy=-earthOrbitR*Math.sin(earthAngle);
 
+  // translate: geo+even → Earth at canvas centre; geo only → Earth at centre via offset; helio → canvas centre
   const tx=state.geoMode ? cx-earthHx : cx;
   const ty=state.geoMode ? cy-earthHy : cy;
 
@@ -572,25 +745,65 @@ function draw(){
   if(state.showTrail && state.geoMode && state.selectedPlanet)
     drawTrails(scale,earthHx,earthHy,evenStep);
 
-  // Sun
-  drawSun(scale,evenStep);
+  if(geoEvenMode){
+    // ── GEO + EVEN MODE ───────────────────────────────────────────────────────
+    // Sub-translate: make (0,0) = Earth = canvas centre
+    ctx.translate(earthHx,earthHy);
 
-  // Orbits + planets
-  for(const key in planetScreenPos) delete planetScreenPos[key];
-  for(let idx=0;idx<PLANETS.length;idx++){
-    const planet=PLANETS[idx];
-    const orbitR=state.evenMode ? evenStep*(idx+1) : planet.au*scale;
-    if(!state.geoMode){
-      const showOrbit=state.selectedPlanet===null||state.selectedPlanet===planet.name;
-      if(showOrbit) drawOrbit(orbitR);
+    // Sun screen position: geocentric direction, scaled to inner slot.
+    const nonEarth=PLANETS.filter(p=>p.name!=='Earth');
+    const zodI=evenStep*(PLANETS.length+1);    // = zodiacInner
+    const sunGeoAngle=earthAngle+Math.PI;
+    const sunEvR=zodI*0.18;                    // Sun at 18% of zodiacInner
+    const sunSX=sunEvR*Math.cos(sunGeoAngle);
+    const sunSY=-sunEvR*Math.sin(sunGeoAngle);
+    drawSun(scale,evenStep,sunSX,sunSY);
+
+
+
+    // Draw each planet: orbit circle centred on Sun, scaled so avg
+    // geocentric dist ≈ geoEvenRingR (non-uniform: inner 2×, outer 1×).
+    for(const key in planetScreenPos) delete planetScreenPos[key];
+
+    // Earth at canvas centre
+    const earthPlanet=PLANETS[2];
+    planetScreenPos['Earth']={x:cx,y:cy,r:earthPlanet.size/2*state.planetScale};
+    drawPlanet(earthPlanet,0,0,scale,evenStep);
+
+    for(const planet of nonEarth){
+      const ringRGE=geoEvenRingR(planet.name,evenStep);
+      // Average geocentric distance in AU ≈ sqrt(earth.au²+planet.au²)
+      const avgGeoDist=Math.sqrt(earth.au*earth.au+planet.au*planet.au);
+      // Scale factor: stretch/compress planet's helio orbit so avg geo = ringRGE
+      const sp=ringRGE/(avgGeoDist*scale);
+
+      const pAng=planetAngleDeg(planet,state.currentDate)*Math.PI/180;
+      const px=sunSX+sp*planet.au*scale*Math.cos(pAng);
+      const py=sunSY-sp*planet.au*scale*Math.sin(pAng);
+      // Canvas coords: translated space origin is at (cx,cy) after sub-translate
+      planetScreenPos[planet.name]={x:cx+px,y:cy+py,r:planet.size/2*state.planetScale};
+      drawPlanet(planet,px,py,scale,evenStep);
     }
-    const angleDeg=planetAngleDeg(planet,state.currentDate);
-    const ar=angleDeg*Math.PI/180;
-    const px=orbitR*Math.cos(ar);
-    const py=-orbitR*Math.sin(ar);
-    const pr=planet.size/2*state.planetScale;
-    planetScreenPos[planet.name]={x:tx+px,y:ty+py,r:pr};
-    drawPlanet(planet,px,py,scale,evenStep);
+  } else {
+    // ── NORMAL / HELIO / GEO (non-even) ──────────────────────────────────────
+    drawSun(scale,evenStep,0,0);
+
+    for(const key in planetScreenPos) delete planetScreenPos[key];
+    for(let idx=0;idx<PLANETS.length;idx++){
+      const planet=PLANETS[idx];
+      const orbitR=(state.evenMode&&!state.geoMode) ? evenStep*(idx+1) : planet.au*scale;
+      if(!state.geoMode){
+        const showOrbit=state.selectedPlanet===null||state.selectedPlanet===planet.name;
+        if(showOrbit) drawOrbit(orbitR);
+      }
+      const angleDeg=planetAngleDeg(planet,state.currentDate);
+      const ar=angleDeg*Math.PI/180;
+      const px=orbitR*Math.cos(ar);
+      const py=-orbitR*Math.sin(ar);
+      const pr=planet.size/2*state.planetScale;
+      planetScreenPos[planet.name]={x:tx+px,y:ty+py,r:pr};
+      drawPlanet(planet,px,py,scale,evenStep);
+    }
   }
 
   ctx.restore();
@@ -598,6 +811,7 @@ function draw(){
   // Overlays (no translate)
   drawDateLabel(w,h);
   drawMoonPhaseOverlay(w,h);
+  drawSunArcOverlay(w,h);
   if(state.showInfo && state.selectedPlanet) drawInfoPanel(w,h);
 }
 
@@ -613,25 +827,27 @@ function drawOrbit(r){
   ctx.restore();
 }
 
-function drawSun(scale,evenStep){
+function drawSun(scale,evenStep,ox,oy){
+  ox=ox||0; oy=oy||0;
   let sunR;
   if(state.evenMode&&evenStep>0) sunR=evenStep*0.38;
   else sunR=Math.max(6,scale*0.12);
+  sunR*=(state.sunScale||1.0);
 
   const glows=[{r:sunR*3.8,a:0.07},{r:sunR*2.8,a:0.14},{r:sunR*2.0,a:0.24},{r:sunR*1.4,a:0.47}];
   for(const g of glows){
-    const gr=ctx.createRadialGradient(0,0,0,0,0,g.r);
+    const gr=ctx.createRadialGradient(ox,oy,0,ox,oy,g.r);
     gr.addColorStop(0,`rgba(255,230,100,${g.a})`);
     gr.addColorStop(1,'rgba(255,150,50,0)');
-    ctx.beginPath(); ctx.arc(0,0,g.r,0,Math.PI*2);
+    ctx.beginPath(); ctx.arc(ox,oy,g.r,0,Math.PI*2);
     ctx.fillStyle=gr; ctx.fill();
   }
   const off=sunR*0.25;
-  const gr=ctx.createRadialGradient(-off,-off,0,-off,-off,sunR*1.1);
+  const gr=ctx.createRadialGradient(ox-off,oy-off,0,ox-off,oy-off,sunR*1.1);
   gr.addColorStop(0,'#ffffc8');
   gr.addColorStop(0.6,'#ffc850');
   gr.addColorStop(1,'#e6821e');
-  ctx.beginPath(); ctx.arc(0,0,sunR,0,Math.PI*2);
+  ctx.beginPath(); ctx.arc(ox,oy,sunR,0,Math.PI*2);
   ctx.fillStyle=gr; ctx.fill();
 }
 
@@ -662,6 +878,11 @@ function drawPlanet(planet,px,py,scale,evenStep){
   ctx.beginPath(); ctx.arc(px,py,r,0,Math.PI*2);
   ctx.fillStyle=dg; ctx.fill();
 
+  // Geo grid lines (under shadow)
+  if(state.showGeoLines && r>=4) drawPlanetGeoLines(px,py,r,planet);
+  // Sun lighting / shadow overlay
+  if(state.showSunLight && r>=3) drawPlanetLighting(px,py,r);
+
   // Saturn rings
   if(planet.name==='Saturn'){
     ctx.save();
@@ -685,15 +906,98 @@ function drawPlanet(planet,px,py,scale,evenStep){
   ctx.fillText(_pnL.planetNames[planet.name]||planet.name, px+r+3, py-r);
 }
 
+// Draw latitude/longitude grid — top-down polar (North Pole) projection
+function drawPlanetGeoLines(px,py,r,planet){
+  const days=daysSinceJ2000(state.currentDate);
+  const spinDir=planet.spin_days<0?-1:1;
+  const rot=((days*360/Math.abs(planet.spin_days)*spinDir)%360+360)%360;
+  const lw=state.geoLineWidth||1.0;
+  const lc=state.geoLineColor||'#64b4ff';
+  function hexToRgba(hex,a){
+    const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+    return `rgba(${r},${g},${b},${a})`;
+  }
+
+  ctx.save();
+  ctx.beginPath(); ctx.arc(px,py,r,0,Math.PI*2); ctx.clip();
+
+  // --- Parallels: concentric circles
+  // In polar (top-view) projection: circle radius = r * cos(lat)
+  // equator(0°) at full r, 30° at r*0.866, 60° at r*0.5, poles at 0
+  for(const lat of [60,30,0,-30,-60]){
+    const circR=r*Math.cos(lat*Math.PI/180);
+    if(circR<1) continue;
+    ctx.beginPath();
+    ctx.arc(px,py,circR,0,Math.PI*2);
+    ctx.strokeStyle=lat===0?hexToRgba(lc,0.55):hexToRgba(lc,0.24);
+    ctx.lineWidth=(lat===0?1.1:0.6)*lw;
+    ctx.stroke();
+  }
+
+  // --- Meridians: spokes every geoLineDensity degrees, rotating
+  const meridStep=state.geoLineDensity||30;
+  for(let lon=0;lon<360;lon+=meridStep){
+    const ang=(((lon-rot)%360+360)%360)*Math.PI/180;
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    ctx.lineTo(px+r*Math.cos(ang), py+r*Math.sin(ang));
+    ctx.strokeStyle=hexToRgba(lc,0.24);
+    ctx.lineWidth=0.6*lw;
+    ctx.stroke();
+  }
+
+  // Equatorial ring at 0° — also add parallels matching density step
+  const parallelStep=meridStep;
+  for(let lat=parallelStep;lat<90;lat+=parallelStep){
+    for(const sign of[1,-1]){
+      const circR=r*Math.cos(lat*sign*Math.PI/180);
+      if(circR<1) continue;
+      ctx.beginPath(); ctx.arc(px,py,circR,0,Math.PI*2);
+      ctx.strokeStyle=hexToRgba(lc,0.20); ctx.lineWidth=0.5*lw; ctx.stroke();
+    }
+  }
+
+  // Pole dot at centre
+  ctx.beginPath(); ctx.arc(px,py,Math.max(1.5,r*0.045),0,Math.PI*2);
+  ctx.fillStyle=hexToRgba(lc,0.55); ctx.fill();
+
+  ctx.restore();
+}
+
+// Draw sun-shadow (terminator) overlay
+function drawPlanetLighting(px,py,r){
+  // Sun is at (0,0) in translated planet-canvas coords
+  const toSunAngle=Math.atan2(-py,-px);
+  const litX=px+r*Math.cos(toSunAngle);
+  const litY=py+r*Math.sin(toSunAngle);
+  const darkX=px-r*Math.cos(toSunAngle);
+  const darkY=py-r*Math.sin(toSunAngle);
+
+  ctx.save();
+  ctx.beginPath(); ctx.arc(px,py,r,0,Math.PI*2); ctx.clip();
+
+  const sg=ctx.createLinearGradient(litX,litY,darkX,darkY);
+  sg.addColorStop(0.0,'rgba(0,0,0,0)');
+  sg.addColorStop(0.44,'rgba(0,0,0,0)');
+  sg.addColorStop(0.58,'rgba(0,0,0,0.50)');
+  sg.addColorStop(0.78,'rgba(0,0,0,0.72)');
+  sg.addColorStop(1.0,'rgba(0,0,0,0.90)');
+  ctx.fillStyle=sg;
+  ctx.fillRect(px-r,py-r,r*2,r*2);
+
+  ctx.restore();
+}
+
 function drawMoons(planet,px,py){
   const moons=MOONS[planet.name];
   if(!moons||!moons.length) return;
   const planetR=planet.size/2;
   const days=daysSinceJ2000(state.currentDate);
   const geoEarth=state.geoMode && planet.name==='Earth';
+  const geoEven=state.geoMode && state.evenMode && planet.name==='Earth';
   const soloEarth=!state.geoMode && planet.name==='Earth';
-  const moonOrbitMult=geoEarth?1.5:(soloEarth?1.2:1.0);
-  const moonSizeMult=geoEarth?3.5:(soloEarth?2.5:1.0);
+  const moonOrbitMult=geoEven?0.65:(geoEarth?1.5:(soloEarth?1.2:1.0));
+  const moonSizeMult=geoEven?2.0:(geoEarth?3.5:(soloEarth?2.5:1.0));
 
   const maxAu=Math.max(...moons.map(m=>m.au));
 
@@ -719,7 +1023,7 @@ function drawSingleMoon(moon,px,py,orbitR,days,sizeMult=1){
   const ang=((moon.mean_lon + 360*days/moon.period)%360)*Math.PI/180;
   const mx=px+orbitR*Math.cos(ang);
   const my=py-orbitR*Math.sin(ang);
-  const mr=moon.size/2*sizeMult;
+  const mr=moon.size/2*sizeMult*(state.moonScale||1);
   // Glow
   const gr=ctx.createRadialGradient(mx,my,0,mx,my,mr*2.2);
   gr.addColorStop(0,colorAlpha(moon.color,0.20));
@@ -805,6 +1109,25 @@ function drawZodiac(w,h){
   }
 }
 
+// Fixed ring radii for geo+even mode: inner planets (Mercury/Venus/Mars) get
+// double spacing; outer planets (Jupiter–Neptune) fill the remaining half.
+// zodI = zodiacInner = evenStep*(PLANETS.length+1)
+function geoEvenRingR(name, evenStep){
+  // Fixed ring fractions of zodiacInner (= evenStep*(PLANETS.length+1)).
+  // Inner planets get proportionally MORE space so they don't crowd the Sun.
+  const zodI = evenStep * (PLANETS.length + 1);
+  const frac = {
+    Mercury: 0.34,
+    Venus:   0.51,
+    Mars:    0.65,
+    Jupiter: 0.74,
+    Saturn:  0.82,
+    Uranus:  0.89,
+    Neptune: 0.96,
+  };
+  return (frac[name] || 0.34) * zodI;
+}
+
 function drawTrails(scale,earthHx,earthHy,evenStep){
   const STEP=5, HALF=550;
   const earthP=PLANETS[2], earthIdx=2;
@@ -815,8 +1138,9 @@ function drawTrails(scale,earthHx,earthHy,evenStep){
   for(const planet of PLANETS){
     if(planet.name==='Earth'||planet.name!==state.selectedPlanet) continue;
     const pIdx=PLANETS.indexOf(planet);
-    const rVisP=state.evenMode?evenStep*(pIdx+1):planet.au*scale;
-    const rVisE=state.evenMode?evenStep*(earthIdx+1):earthP.au*scale;
+    const _geoEven=state.geoMode&&state.evenMode;
+    const rVisP=(!_geoEven&&state.evenMode)?evenStep*(pIdx+1):planet.au*scale;
+    const rVisE=(!_geoEven&&state.evenMode)?evenStep*(earthIdx+1):earthP.au*scale;
     const rAuP=planet.au*scale;
     const pts=[], lons=[];
     let lo=Math.max(0,curAbs-HALF);
@@ -827,8 +1151,22 @@ function drawTrails(scale,earthHx,earthHy,evenStep){
       const d=dateFromOffset(state.sliderMin,day);
       const angP=planetAngleDeg(planet,d)*Math.PI/180;
       const angE=planetAngleDeg(earthP,d)*Math.PI/180;
-      const txP=rVisP*Math.cos(angP)-rVisE*Math.cos(angE)+earthHx;
-      const tyP=-rVisP*Math.sin(angP)+rVisE*Math.sin(angE)+earthHy;
+      let txP,tyP;
+      if(_geoEven){
+        // Mirror geo+even projection: Sun at geocentric dir, sp from geoEvenRingR
+        const zodIT=evenStep*(PLANETS.length+1);
+        const sunRT=zodIT*0.18;                // matches geo+even sunEvR fraction
+        const sunXT=sunRT*Math.cos(angE+Math.PI);
+        const sunYT=-sunRT*Math.sin(angE+Math.PI);
+        const ringRT=geoEvenRingR(planet.name,evenStep);
+        const avgGeoT=Math.sqrt(earthP.au*earthP.au+planet.au*planet.au);
+        const spT=ringRT/(avgGeoT*scale);
+        txP=earthHx+sunXT+spT*planet.au*scale*Math.cos(angP);
+        tyP=earthHy+sunYT-spT*planet.au*scale*Math.sin(angP);
+      } else {
+        txP=rVisP*Math.cos(angP)-rVisE*Math.cos(angE)+earthHx;
+        tyP=-rVisP*Math.sin(angP)+rVisE*Math.sin(angE)+earthHy;
+      }
       const gx=rAuP*Math.cos(angP)-rAuE*Math.cos(angE);
       const gy=-(-rAuP*Math.sin(angP)+rAuE*Math.sin(angE));
       const lon=((Math.atan2(gy,gx)*180/Math.PI)%360+360)%360;
@@ -905,6 +1243,7 @@ function drawDateLabel(w,h){
 
 function drawMoonPhaseOverlay(w,h){
   const {symbol,name,illum,angle}=moonPhaseInfo(state.currentDate);
+  const wfs=state.widgetFontScale||1.0;
   const pad=12, diskR=34, boxW=170, boxH=diskR*2+52;
   const bx=pad, by=pad;
 
@@ -940,10 +1279,10 @@ function drawMoonPhaseOverlay(w,h){
   const tx=bx+diskR*2+pad*2;
   const tw=boxW-diskR*2-pad*3;
   ctx.textAlign='left'; ctx.textBaseline='middle';
-  ctx.font=`bold 10px 'Segoe UI',Arial`;
+  ctx.font=`bold ${Math.round(10*wfs)}px 'Segoe UI',Arial`;
   ctx.fillStyle='rgba(210,230,255,0.90)';
   ctx.fillText(name,tx,by+pad+9);
-  ctx.font=`9px 'Segoe UI',Arial`;
+  ctx.font=`${Math.round(9*wfs)}px 'Segoe UI',Arial`;
   ctx.fillStyle='rgba(150,190,240,0.784)';
   ctx.fillText(`${(LOCALE[state.lang]||LOCALE.en).illuminated}: ${illum}%`,tx,by+pad+29);
 
@@ -953,6 +1292,176 @@ function drawMoonPhaseOverlay(w,h){
   ctx.fillStyle='rgba(30,40,70,1)'; ctx.fill();
   ctx.beginPath(); roundRect(ctx,barX,barY,barW*illum/100,barH,3);
   ctx.fillStyle='rgba(200,220,255,0.784)'; ctx.fill();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SUNRISE / SUNSET CALCULATION + SUN ARC OVERLAY
+// ─────────────────────────────────────────────────────────────────────────────
+let geoLat=null, geoLon=null, geoPending=false;
+function requestGeolocation(){
+  if(geoPending||geoLat!==null) return;
+  geoPending=true;
+  if(!navigator.geolocation){ geoLat=51.5; geoLon=0; geoPending=false; return; } // fallback London
+  navigator.geolocation.getCurrentPosition(
+    pos=>{ geoLat=pos.coords.latitude; geoLon=pos.coords.longitude; geoPending=false; draw(); },
+    ()=>{ geoLat=51.5; geoLon=0; geoPending=false; draw(); },
+    {timeout:8000}
+  );
+}
+// Request on load
+requestGeolocation();
+
+/**
+ * Compute sunrise/sunset for a given UTC date and observer lat/lon.
+ * Returns {rise, set, transAlt, decl} where rise/set are UTC hours (0‑24),
+ * or null if polar day/night.
+ * Uses NOAA/Astronomical almanac algorithm (accurate ±1 min).
+ */
+function sunriseSunset(dateUTC, lat, lon){
+  const rad=Math.PI/180, deg=180/Math.PI;
+  const jd=(dateUTC.getTime()/86400000)+2440587.5;
+  const n=jd-2451545.0;
+  // Mean longitude / anomaly
+  const L=((280.46+0.9856474*n)%360+360)%360;
+  const g=((357.528+0.9856003*n)%360+360)%360*rad;
+  const lam=(L+1.915*Math.sin(g)+0.020*Math.sin(2*g));
+  const eps=(23.439-0.0000004*n)*rad;
+  const lamR=lam*rad;
+  const decl=Math.asin(Math.sin(eps)*Math.sin(lamR))*deg; // solar declination °
+  const eqTime=720*((n/36525*0.0000538+0.000075) // simplified EqT in minutes
+    - Math.sin(g)*0.004697 - Math.sin(2*g)*0.000141);
+  // Hour angle of sunrise: cos(H)=(sin(-0.833°)-sin(lat)*sin(decl))/(cos(lat)*cos(decl))
+  const sinD=Math.sin(decl*rad), cosD=Math.cos(decl*rad);
+  const cosL=Math.cos(lat*rad), sinL=Math.sin(lat*rad);
+  const cosH=(Math.sin(-0.8333*rad)-sinL*sinD)/(cosL*cosD);
+  if(cosH<-1) return {rise:null,set:null,decl,polarDay:true};  // midnight sun
+  if(cosH>1)  return {rise:null,set:null,decl,polarDay:false}; // polar night
+  const H=Math.acos(cosH)*deg; // H in degrees
+  // Solar noon UTC minutes = 720 - 4*lon - eqTime
+  const noonMin=720 - 4*lon - eqTime;
+  const rise=(noonMin - H*4)/60; // hours UTC
+  const set =(noonMin + H*4)/60;
+  // Max solar altitude at transit
+  const transAlt=(90-lat+decl)*(lat>=0?1:-1);
+  return {rise:((rise%24)+24)%24, set:((set%24)+24)%24, decl, transAlt:Math.min(90,Math.abs(90-lat+decl)), polarDay:null};
+}
+
+function fmtHour(h){
+  if(h==null) return '--:--';
+  const hh=Math.floor(((h%24)+24)%24);
+  const mm=Math.round((h-Math.floor(h))*60);
+  return `${String(hh).padStart(2,'0')}:${String(mm<60?mm:0).padStart(2,'0')}`;
+}
+
+function drawSunArcOverlay(w,h){
+  // Helper: daylight duration (hours) for a given solar declination and latitude
+  function daylightHours(decl_deg, lat_deg){
+    const rad=Math.PI/180;
+    const cosH=(Math.sin(-0.8333*rad)-Math.sin(lat_deg*rad)*Math.sin(decl_deg*rad))
+               /(Math.cos(lat_deg*rad)*Math.cos(decl_deg*rad));
+    if(cosH<=-1) return 24; if(cosH>=1) return 0;
+    return Math.acos(cosH)*(24/Math.PI);
+  }
+
+  const wfs=state.widgetFontScale||1.0;
+  const pad=12;
+  const moonBoxH=34*2+52;
+  const bx=pad, by=pad+moonBoxH+6;
+  // Fixed box width = longest-day arc diameter + padding
+  const boxW=220, boxH=96;
+  const horizonFromBottom=22;
+
+  if(geoLat===null){
+    ctx.save();
+    ctx.beginPath(); roundRect(ctx,bx,by,boxW,boxH,8);
+    ctx.fillStyle='rgba(8,15,38,0.75)'; ctx.fill();
+    ctx.strokeStyle='rgba(100,140,200,0.40)'; ctx.lineWidth=1; ctx.stroke();
+    ctx.font=`${Math.round(9*wfs)}px "Segoe UI",Arial`; ctx.fillStyle='rgba(150,180,220,0.7)';
+    ctx.textAlign='left'; ctx.textBaseline='middle';
+    ctx.fillText('Requesting location…',bx+10,by+boxH/2);
+    ctx.restore(); return;
+  }
+
+  const ss=sunriseSunset(state.currentDate, geoLat, geoLon);
+
+  // Max daylight for this latitude (solstice decls ±23.44°)
+  const maxDur=Math.max(daylightHours(23.44,geoLat), daylightHours(-23.44,geoLat));
+  let curDur=0;
+  if(ss.polarDay===true) curDur=24;
+  else if(ss.polarDay===false) curDur=0;
+  else { const r2=ss.rise,s2=ss.set; curDur=s2>r2?s2-r2:(s2+24)-r2; }
+
+  // Arc radius: max radius fills box, current day scales proportionally
+  const arcMaxR=(boxW-20)/2;
+  const arcR=Math.max(8, arcMaxR*(curDur/Math.max(maxDur,1)));
+  const arcCX=bx+boxW/2;
+  const arcCY=by+boxH-horizonFromBottom;
+
+  // Panel background
+  ctx.save();
+  ctx.beginPath(); roundRect(ctx,bx,by,boxW,boxH,8);
+  ctx.fillStyle='rgba(8,15,38,0.78)'; ctx.fill();
+  ctx.strokeStyle='rgba(100,140,200,0.40)'; ctx.lineWidth=1; ctx.stroke();
+
+  // Horizon line
+  ctx.beginPath();
+  ctx.moveTo(bx+6,arcCY); ctx.lineTo(bx+boxW-6,arcCY);
+  ctx.strokeStyle='rgba(100,150,200,0.40)'; ctx.lineWidth=1; ctx.stroke();
+
+  if(ss.polarDay===true){
+    ctx.font=`bold ${Math.round(10*wfs)}px "Segoe UI",Arial`; ctx.fillStyle='rgba(255,230,120,0.85)';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('☀ Midnight Sun',arcCX,by+boxH/2);
+    ctx.restore(); return;
+  }
+  if(ss.polarDay===false){
+    ctx.font=`bold ${Math.round(10*wfs)}px "Segoe UI",Arial`; ctx.fillStyle='rgba(160,200,255,0.70)';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('Polar Night',arcCX,by+boxH/2);
+    ctx.restore(); return;
+  }
+
+  // Max-day guide arc (faint dashed outline)
+  ctx.beginPath();
+  ctx.arc(arcCX,arcCY,arcMaxR,Math.PI,0);
+  ctx.strokeStyle='rgba(80,120,200,0.18)'; ctx.lineWidth=1;
+  ctx.setLineDash([2,5]); ctx.stroke(); ctx.setLineDash([]);
+
+  // Sky gradient fill for today's arc
+  const skyGrad=ctx.createLinearGradient(arcCX,arcCY-arcR, arcCX,arcCY);
+  skyGrad.addColorStop(0,'rgba(20,60,140,0.55)');
+  skyGrad.addColorStop(1,'rgba(20,60,140,0.05)');
+  ctx.beginPath(); ctx.arc(arcCX,arcCY,arcR,Math.PI,0); ctx.closePath();
+  ctx.fillStyle=skyGrad; ctx.fill();
+
+  // Today's arc path
+  ctx.beginPath();
+  ctx.arc(arcCX,arcCY,arcR,Math.PI,0);
+  ctx.strokeStyle='rgba(255,200,80,0.42)'; ctx.lineWidth=1.3;
+  ctx.setLineDash([3,4]); ctx.stroke(); ctx.setLineDash([]);
+
+  // Tick + label at rise / set endpoints (convert UTC → local browser time)
+  const _tzH=-new Date().getTimezoneOffset()/60;
+  const riseH=ss.rise!=null?(ss.rise+_tzH+48)%24:null;
+  const setH =ss.set !=null?(ss.set +_tzH+48)%24:null;
+  function arcTick(angle, label, align){
+    const tx=arcCX+arcR*Math.cos(angle), ty=arcCY;
+    ctx.beginPath(); ctx.moveTo(tx,ty-6); ctx.lineTo(tx,ty+6);
+    ctx.strokeStyle='rgba(255,200,80,0.70)'; ctx.lineWidth=1.4; ctx.stroke();
+    ctx.font=`bold ${Math.round(10*wfs)}px "Segoe UI",Arial`;
+    ctx.fillStyle='rgba(255,215,120,0.92)';
+    ctx.textAlign=align; ctx.textBaseline='top';
+    ctx.fillText(label, tx+(align==='left'?5:-5), ty+7);
+  }
+  arcTick(Math.PI, fmtHour(riseH), 'left');
+  arcTick(0,       fmtHour(setH),  'right');
+
+  // Location + daylight hours corner label
+  ctx.font=`${Math.round(8*wfs)}px "Segoe UI",Arial`; ctx.fillStyle='rgba(150,190,240,0.60)';
+  ctx.textAlign='left'; ctx.textBaseline='top';
+  ctx.fillText(`${geoLat>=0?'N':'S'}${Math.abs(geoLat).toFixed(1)}°  ◑ ${curDur.toFixed(1)}h`,bx+5,by+4);
+
+  ctx.restore();
 }
 
 function drawMoonLitRegion(mcx,mcy,diskR,angle){
@@ -997,6 +1506,7 @@ function drawMoonLitRegion(mcx,mcy,diskR,angle){
 function drawInfoPanel(w,h){
   const planet=PLANETS.find(p=>p.name===state.selectedPlanet);
   if(!planet) return;
+  const wfs=state.widgetFontScale||1.0;
 
   const earth=PLANETS[2];
   let distStr='—';
@@ -1021,10 +1531,10 @@ function drawInfoPanel(w,h){
     [lbl[5],distStr],
   ];
 
-  const pad=14, lineH=26, titleH=30;
-  const panelW=260, panelH=pad*2+titleH+lines.length*lineH+4;
-  const moonBoxBottom=pad+34*2+52+8;
-  const px0=pad, py0=moonBoxBottom;
+  const pad=14, lineH=Math.round(26*wfs), titleH=Math.round(30*wfs);
+  const panelW=Math.round(260*Math.max(1,wfs)), panelH=pad*2+titleH+lines.length*lineH+4;
+  // Place below sun-arc panel (moon box 120px + 6gap + sunArc 96px + 6gap = 228px from top)
+  const px0=pad, py0=12+120+6+96+6;
 
   const {r,g,b}=hexToRgb(planet.color);
   ctx.beginPath(); roundRect(ctx,px0,py0,panelW,panelH,8);
@@ -1033,7 +1543,7 @@ function drawInfoPanel(w,h){
 
   ctx.textAlign='left'; ctx.textBaseline='middle';
   const _ipL=LOCALE[state.lang]||LOCALE.en;
-  ctx.font=`bold 14px 'Segoe UI',Arial`;
+  ctx.font=`bold ${Math.round(14*wfs)}px 'Segoe UI',Arial`;
   ctx.fillStyle=lighten(planet.color,55);
   ctx.fillText((_ipL.planetNames[planet.name]||planet.name),px0+pad,py0+pad+titleH/2);
 
@@ -1041,15 +1551,48 @@ function drawInfoPanel(w,h){
   ctx.beginPath(); ctx.moveTo(px0+pad,sepY); ctx.lineTo(px0+panelW-pad,sepY);
   ctx.strokeStyle=`rgba(${r},${g},${b},0.31)`; ctx.lineWidth=1; ctx.stroke();
 
-  const lblW=120;
+  const lblW=Math.round(120*Math.max(1,wfs));
   for(let i=0;i<lines.length;i++){
     const rowY=sepY+4+i*lineH+lineH/2;
-    ctx.font=`10px 'Segoe UI',Arial`;
+    ctx.font=`${Math.round(10*wfs)}px 'Segoe UI',Arial`;
     ctx.fillStyle='rgba(140,170,210,0.82)';
     ctx.fillText(lines[i][0]+':',px0+pad,rowY);
-    ctx.font=`bold 10px 'Segoe UI',Arial`;
+    ctx.font=`bold ${Math.round(10*wfs)}px 'Segoe UI',Arial`;
     ctx.fillStyle='rgba(220,235,255,0.94)';
     ctx.fillText(lines[i][1],px0+pad+lblW,rowY);
+  }
+
+  // Astrology section — only when zodiac ring is visible
+  if(state.showZodiac || state.showSectors){
+    const zodiacIdx=Math.floor(geoEclLonDeg(planet,state.currentDate)/30);
+    const signName=((LOCALE[state.lang]||LOCALE.en).zodiacNames||ZODIAC_NAMES_EN)[zodiacIdx];
+    const astroTxt=(ASTRO_PLANET_SIGN[state.lang]||ASTRO_PLANET_SIGN.en)[planet.name]?.[zodiacIdx]||'';
+    if(astroTxt){
+      const astW=panelW, astPad=10;
+      const words=astroTxt.split(' ');
+      // word-wrap into lines of ~astW-2*astPad px at scaled font
+      ctx.font=`${Math.round(9*wfs)}px 'Segoe UI',Arial`;
+      const maxLineW=astW-astPad*2;
+      const wrapped=[];
+      let cur='';
+      for(const w of words){
+        const test=cur?cur+' '+w:w;
+        if(ctx.measureText(test).width>maxLineW&&cur){wrapped.push(cur);cur=w;}else cur=test;
+      }
+      if(cur) wrapped.push(cur);
+      const astH=16+wrapped.length*Math.round(14*wfs)+astPad;
+      const ay=py0+panelH+4;
+      ctx.beginPath(); roundRect(ctx,px0,ay,astW,astH,8);
+      ctx.fillStyle='rgba(10,18,40,0.82)'; ctx.fill();
+      ctx.strokeStyle=`rgba(${r},${g},${b},0.35)`; ctx.lineWidth=1; ctx.stroke();
+      ctx.font=`bold ${Math.round(9*wfs)}px 'Segoe UI',Arial`;
+      ctx.fillStyle=`rgba(${r},${g},${b},0.9)`;
+      ctx.textAlign='left'; ctx.textBaseline='top';
+      ctx.fillText(`${_ipL.planetNames[planet.name]||planet.name} in ${signName}`,px0+astPad,ay+6);
+      ctx.font=`${Math.round(9*wfs)}px 'Segoe UI',Arial`;
+      ctx.fillStyle='rgba(190,210,240,0.88)';
+      wrapped.forEach((line,i)=>ctx.fillText(line,px0+astPad,ay+6+Math.round(16*wfs)+i*Math.round(14*wfs)));
+    }
   }
 }
 
@@ -1194,6 +1737,12 @@ function syncAllUI(){
   const pv=Math.round(state.planetScale*100);
   document.getElementById('planetSlider').value=pv;
   document.getElementById('lblPlanet').textContent=(state.planetScale).toFixed(2)+'×';
+  const sv=Math.round(state.sunScale*100);
+  document.getElementById('sunSlider').value=sv;
+  document.getElementById('lblSun').textContent=(state.sunScale).toFixed(2)+'×';
+  const mv=Math.round(state.moonScale*100);
+  document.getElementById('moonSlider').value=mv;
+  document.getElementById('lblMoon').textContent=(state.moonScale).toFixed(2)+'×';
   // Buttons
   setBtn('btnEven',state.evenMode);
   setBtn('btnGeo',state.geoMode);
@@ -1202,6 +1751,8 @@ function syncAllUI(){
   setBtn('btnTrail',state.showTrail);
   setBtn('btnInfo',state.showInfo);
   setBtn('btnMarks',state.showMarks);
+  setBtn('btnSunLight',state.showSunLight);
+  setBtn('btnGeoLines',state.showGeoLines);
   // Zodiac & sector & trail buttons only in geo mode
   document.getElementById('btnZodiac').style.display=state.geoMode?'':'none';
   document.getElementById('btnSectors').style.display=state.geoMode?'':'none';
@@ -1211,7 +1762,7 @@ function syncAllUI(){
   document.getElementById('lblZoom').style.display=state.evenMode?'none':'';
   document.getElementById('lblZoomText').style.display=state.evenMode?'none':'';
   // Speed slider
-  document.getElementById('speedSlider').value=Math.round(state.animSpeed*10);
+  document.getElementById('speedSlider').value=Math.round(state.animSpeed*100);
   document.getElementById('lblSpeed').textContent=state.animSpeed.toFixed(1)+'×';
   // Alignment count
   document.getElementById('lblAlignCount').textContent=state.alignmentMarks.length;
@@ -1265,6 +1816,20 @@ document.getElementById('planetSlider').addEventListener('input',e=>{
   draw(); saveSettings();
 });
 
+// Sun scale
+document.getElementById('sunSlider').addEventListener('input',e=>{
+  state.sunScale=parseInt(e.target.value)/100;
+  document.getElementById('lblSun').textContent=state.sunScale.toFixed(2)+'×';
+  draw(); saveSettings();
+});
+
+// Moon scale
+document.getElementById('moonSlider').addEventListener('input',e=>{
+  state.moonScale=parseInt(e.target.value)/100;
+  document.getElementById('lblMoon').textContent=state.moonScale.toFixed(2)+'×';
+  draw(); saveSettings();
+});
+
 // Play
 let animTimer=null;
 let animLastTime=null;
@@ -1300,11 +1865,19 @@ document.getElementById('btnPlay').addEventListener('click',()=>{
 
 // Speed
 document.getElementById('speedSlider').addEventListener('input',e=>{
-  state.animSpeed=parseInt(e.target.value)/10;
-  document.getElementById('lblSpeed').textContent=state.animSpeed.toFixed(1)+'×';
+  state.animSpeed=parseInt(e.target.value)/100;
+  document.getElementById('lblSpeed').textContent=state.animSpeed +'×';
   // no timer restart needed — rAF loop reads state.animSpeed each frame
   saveSettings();
 });
+
+// Extract YouTube video ID from URL or bare ID
+function extractYTId(input){
+  if(!input) return '';
+  // youtu.be/ID or youtube.com/watch?v=ID or just ID
+  const m=input.match(/(?:youtu\.be\/|[?&]v=)([\w-]{11})/);
+  return m?m[1]:input.replace(/[^\w-]/g,'').slice(0,11);
+}
 
 // YouTube music player
 let ytPlayer=null;
@@ -1330,12 +1903,13 @@ function startYTMusic(){
     wrap.appendChild(inner);
     document.body.appendChild(wrap);
   }
+  const vid=state.musicUrl||'Y3B_cNyFOSc';
   ytPlayer=new YT.Player('ytPlayerEl',{
     height:'1',width:'1',
-    videoId:'Y3B_cNyFOSc',
-    playerVars:{autoplay:1,loop:1,playlist:'Y3B_cNyFOSc',
+    videoId:vid,
+    playerVars:{autoplay:1,loop:1,playlist:vid,
                 controls:0,disablekb:1,fs:0,iv_load_policy:3,modestbranding:1,rel:0,mute:0},
-    events:{onReady:e=>{ e.target.unMute(); e.target.setVolume(80); e.target.playVideo(); }}
+    events:{onReady:e=>{ e.target.unMute(); e.target.setVolume(state.musicVol??80); e.target.playVideo(); }}
   });
 }
 function stopYTMusic(){
@@ -1347,9 +1921,11 @@ document.getElementById('btnMusic').addEventListener('click',()=>{
   const btn=document.getElementById('btnMusic');
   if(ytPlayer){
     stopYTMusic();
+    state.musicOn=false;
     btn.textContent='♪';
     btn.classList.remove('active');
   } else {
+    state.musicOn=true;
     btn.textContent='🔇';
     btn.classList.add('active');
     loadYouTubeAPI();
@@ -1359,6 +1935,7 @@ document.getElementById('btnMusic').addEventListener('click',()=>{
     };
     tryStart();
   }
+  saveSettings();
 });
 // Now
 document.getElementById('btnNow').addEventListener('click',()=>{
@@ -1422,6 +1999,8 @@ toggleBtn('btnSectors','showSectors');
 toggleBtn('btnTrail','showTrail');
 toggleBtn('btnInfo','showInfo');
 toggleBtn('btnMarks','showMarks');
+toggleBtn('btnSunLight','showSunLight');
+toggleBtn('btnGeoLines','showGeoLines');
 
 // Solar term nav
 document.getElementById('btnPrevST').addEventListener('click',()=>{
@@ -1484,11 +2063,13 @@ document.getElementById('btnNextAlign').addEventListener('click',()=>{
 document.getElementById('lblMin').addEventListener('click',()=>{
   document.getElementById('settDateMin').value=dateToISO(state.sliderMin);
   document.getElementById('settDateMax').value=dateToISO(state.sliderMax);
+  applySettingsLocale(state.lang);
   document.getElementById('settingsModal').classList.add('open');
 });
 document.getElementById('lblMax').addEventListener('click',()=>{
   document.getElementById('settDateMin').value=dateToISO(state.sliderMin);
   document.getElementById('settDateMax').value=dateToISO(state.sliderMax);
+  applySettingsLocale(state.lang);
   document.getElementById('settingsModal').classList.add('open');
 });
 
@@ -1499,16 +2080,25 @@ document.getElementById('btnSettings').addEventListener('click',()=>{
   document.getElementById('settZFontVal').textContent=Math.round(state.zodiacFontScale*100);
   document.getElementById('settMFont').value=Math.round(state.monthFontScale*100);
   document.getElementById('settMFontVal').textContent=Math.round(state.monthFontScale*100);
+  document.getElementById('settWidgetFont').value=Math.round(state.widgetFontScale*100);
+  document.getElementById('settWidgetFontVal').textContent=Math.round(state.widgetFontScale*100);
   document.getElementById('settStarDensity').value=state.starDensity;
   document.getElementById('settStarDensityVal').textContent=state.starDensity;
   document.getElementById('settStarSize').value=Math.round(state.starSize*100);
   document.getElementById('settStarSizeVal').textContent=Math.round(state.starSize*100)+'%';
   document.getElementById('settStarOpacity').value=Math.round(state.starOpacity*100);
   document.getElementById('settStarOpacityVal').textContent=Math.round(state.starOpacity*100)+'%';
+  document.getElementById('settGeoLineW').value=Math.round(state.geoLineWidth*10);
+  document.getElementById('settGeoLineWVal').textContent=state.geoLineWidth.toFixed(1);
+  document.getElementById('settGeoLineColor').value=state.geoLineColor||'#64b4ff';
+  document.getElementById('settGeoLineDensity').value=state.geoLineDensity||30;
+  document.getElementById('settGeoLineDensityVal').textContent=(state.geoLineDensity||30)+'°';
+  document.getElementById('settMusicUrl').value=state.musicUrl||'';
   document.getElementById('settMinAlign').value=state.minAlignPlanets;
   document.getElementById('settDateMin').value=dateToISO(state.sliderMin);
   document.getElementById('settDateMax').value=dateToISO(state.sliderMax);
   document.getElementById('settDateErr').textContent='';
+  applySettingsLocale(state.lang);
   document.getElementById('settingsModal').classList.add('open');
   setTimeout(()=>document.getElementById('settDateMin').focus(),80);
 });
@@ -1517,6 +2107,14 @@ document.getElementById('settZFont').addEventListener('input',e=>{
 });
 document.getElementById('settMFont').addEventListener('input',e=>{
   document.getElementById('settMFontVal').textContent=e.target.value;
+});
+document.getElementById('settWidgetFont').addEventListener('input',e=>{
+  document.getElementById('settWidgetFontVal').textContent=e.target.value;
+});
+document.getElementById('volSlider').addEventListener('input',e=>{
+  state.musicVol=parseInt(e.target.value);
+  if(ytPlayer){try{ytPlayer.setVolume(state.musicVol);}catch(err){}}
+  saveSettings();
 });
 document.getElementById('settStarDensity').addEventListener('input',e=>{
   document.getElementById('settStarDensityVal').textContent=e.target.value;
@@ -1527,6 +2125,12 @@ document.getElementById('settStarSize').addEventListener('input',e=>{
 document.getElementById('settStarOpacity').addEventListener('input',e=>{
   document.getElementById('settStarOpacityVal').textContent=e.target.value+'%';
 });
+document.getElementById('settGeoLineW').addEventListener('input',e=>{
+  document.getElementById('settGeoLineWVal').textContent=(parseInt(e.target.value)/10).toFixed(1);
+});
+document.getElementById('settGeoLineDensity').addEventListener('input',e=>{
+  document.getElementById('settGeoLineDensityVal').textContent=e.target.value+'°';
+});
 document.getElementById('settOk').addEventListener('click',()=>{
   const errEl=document.getElementById('settDateErr');
   errEl.textContent='';
@@ -1535,12 +2139,15 @@ document.getElementById('settOk').addEventListener('click',()=>{
   const maxStr=document.getElementById('settDateMax').value.trim();
   const newDateMin=ISO_RE.test(minStr)?isoToDate(minStr):null;
   const newDateMax=ISO_RE.test(maxStr)?isoToDate(maxStr):null;
-  if(!newDateMin||isNaN(newDateMin)){errEl.textContent='Start date invalid — use YYYY-MM-DD';return;}
-  if(!newDateMax||isNaN(newDateMax)){errEl.textContent='End date invalid — use YYYY-MM-DD';return;}
-  if(newDateMax<=newDateMin){errEl.textContent='End date must be after start date';return;}
+  const _L=(LOCALE[document.getElementById('settLang').value]||LOCALE.en).settingsLabels||{};
+  if(!newDateMin||isNaN(newDateMin)){errEl.textContent=_L.errInvalidStart||'Start date invalid — use YYYY-MM-DD';return;}
+  if(!newDateMax||isNaN(newDateMax)){errEl.textContent=_L.errInvalidEnd||'End date invalid — use YYYY-MM-DD';return;}
+  if(newDateMax<=newDateMin){errEl.textContent=_L.errDateOrder||'End date must be after start date';return;}
   state.lang=document.getElementById('settLang').value;
   state.zodiacFontScale=parseInt(document.getElementById('settZFont').value)/100;
   state.monthFontScale=parseInt(document.getElementById('settMFont').value)/100;
+  state.widgetFontScale=parseInt(document.getElementById('settWidgetFont').value)/100;
+  applySettingsLocale(state.lang);
   const newStarDensity=parseInt(document.getElementById('settStarDensity').value);
   const newStarSize=parseInt(document.getElementById('settStarSize').value)/100;
   const newStarOpacity=parseInt(document.getElementById('settStarOpacity').value)/100;
@@ -1548,6 +2155,12 @@ document.getElementById('settOk').addEventListener('click',()=>{
     state.starDensity=newStarDensity; state.starSize=newStarSize; state.starOpacity=newStarOpacity;
     starsCache=null; // force rebuild
   }
+  state.geoLineWidth=parseInt(document.getElementById('settGeoLineW').value)/10;
+  state.geoLineColor=document.getElementById('settGeoLineColor').value;
+  state.geoLineDensity=parseInt(document.getElementById('settGeoLineDensity').value)||30;
+  // Music URL: accept full URL or bare ID
+  const rawMusicUrl=document.getElementById('settMusicUrl').value.trim();
+  if(rawMusicUrl) state.musicUrl=extractYTId(rawMusicUrl);
   const newMin2=parseInt(document.getElementById('settMinAlign').value);
   if(!isNaN(newMin2)&&newMin2>=3&&newMin2<=8) state.minAlignPlanets=newMin2;
   if(newDateMin.getTime()!==state.sliderMin.getTime()||newDateMax.getTime()!==state.sliderMax.getTime()){
@@ -1611,6 +2224,8 @@ ro.observe(document.getElementById('sliderWrap'));
 // INIT
 // ─────────────────────────────────────────────────────────────────────────────
 loadSettings();
+document.getElementById('volSlider').value=state.musicVol??80;
+applySettingsLocale(state.lang);
 syncAllUI();
 resizeCanvas();
 resizeSliderCanvas();
@@ -1618,6 +2233,23 @@ resizeSliderCanvas();
 state.solarTerms=computeSolarTerms(state.sliderMin,state.sliderMax);
 recomputeAlignmentsAsync();
 draw();
+// Auto-start music on first user interaction (respects saved musicOn flag)
+if(state.musicOn){
+  const _startMusicOnce=()=>{
+    document.removeEventListener('click',_startMusicOnce,{capture:true});
+    document.removeEventListener('keydown',_startMusicOnce,{capture:true});
+    const btn=document.getElementById('btnMusic');
+    if(!ytPlayer){
+      btn.textContent='🔇';
+      btn.classList.add('active');
+      loadYouTubeAPI();
+      const tryStart=()=>{ if(ytApiReady){ startYTMusic(); } else { setTimeout(tryStart,150); } };
+      tryStart();
+    }
+  };
+  document.addEventListener('click',_startMusicOnce,{capture:true,once:true});
+  document.addEventListener('keydown',_startMusicOnce,{capture:true,once:true});
+}
 // Clock ticker – redraw every 30 s so the time stays current
 setInterval(()=>{ if(!state.playing) draw(); },30000);
 </script>
