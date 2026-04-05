@@ -60,25 +60,30 @@ input[type=range].inlineSlider::-moz-range-thumb{width:14px;height:14px;border-r
   #timeSlider{height:8px}
   input[type=range].inlineSlider{height:8px}
 }
+/* Row-break helpers (invisible on desktop) */
+.tbBreak{display:none}
+#toolbarOuter{position:relative}
 @media (max-width:900px){
-  #toolbar{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;padding-bottom:4px;scrollbar-width:none}
-  #toolbar::-webkit-scrollbar{display:none}
   .sep,.btn,.lbl,.valLbl,input[type=range].inlineSlider{flex-shrink:0}
   .modal{min-width:unset;width:92vw;max-width:92vw;padding:16px}
   #sliderRow{height:48px}
 }
 @media (max-width:540px){
   #app{padding:2px;gap:3px}
+  /* Multi-row toolbar */
+  #toolbar{flex-wrap:wrap;overflow:visible;padding-bottom:2px;gap:3px 3px;align-items:center}
+  .tbBreak{display:block;flex-basis:100%;width:100%;height:0;margin:0}
+  .sep{display:none}
   .valLbl{font-size:8pt;min-width:26px}
   .lbl{font-size:8pt}
   #speedSlider{width:64px!important}
   #volSlider{width:44px!important}
   #warpSpeedSlider{width:48px!important}
   #constScaleSlider{width:42px!important}
-  #planetSlider{width:60px!important}
-  #sunSlider{width:48px!important}
-  #moonSlider{width:48px!important}
-  #zoomSlider{width:80px!important}
+  #planetSlider{width:72px!important}
+  #sunSlider{width:56px!important}
+  #moonSlider{width:56px!important}
+  #zoomSlider{width:90px!important}
 }
 </style>
 </head>
@@ -99,7 +104,9 @@ input[type=range].inlineSlider::-moz-range-thumb{width:14px;height:14px;border-r
   </div>
 
   <!-- Toolbar -->
+  <div id="toolbarOuter">
   <div id="toolbar">
+    <!-- Row 1: playback + basics -->
     <button class="btn" id="btnPlay" title="Play / Pause">▶</button>
     <input type="range" class="inlineSlider" id="speedSlider" min="1" max="100" value="10" style="width:100px" title="Playback speed"/>
     <span class="valLbl" id="lblSpeed" style="min-width:28px">1.0×</span>
@@ -108,6 +115,8 @@ input[type=range].inlineSlider::-moz-range-thumb{width:14px;height:14px;border-r
     <button class="btn" id="btnMusic" title="Ambient music">♪</button>
     <input type="range" class="inlineSlider" id="volSlider" min="0" max="100" value="80" title="Music volume" style="width:64px"/>
     <button class="btn" id="btnSettings" title="Settings">⚙</button>
+    <div class="tbBreak"></div>
+    <!-- Row 2: view toggles + warp + constellations -->
     <button class="btn active" id="btnEven"    title="Equal orbit spacing"  >≡</button>
     <button class="btn" id="btnGeo"     title="Earth-centric view"    >♁</button>
     <button class="btn" id="btnZodiac"   title="Toggle zodiac ring"    >♈</button>
@@ -126,6 +135,8 @@ input[type=range].inlineSlider::-moz-range-thumb{width:14px;height:14px;border-r
     <button class="btn" id="btnNextAlign" title="Next alignment"     style="min-width:26px;padding:0 4px">►</button>
     <span class="valLbl" id="lblAlignCount" style="min-width:24px;text-align:center;font-size:9pt">0</span>
     <button class="btn active" id="btnMarks" title="Toggle alignment marks">●</button>
+    <div class="tbBreak"></div>
+    <!-- Row 3: size sliders + zoom -->
     <div class="sep"></div>
     <span class="lbl" title="Planet size scale">⊕</span>
     <input type="range" class="inlineSlider" id="planetSlider" min="25" max="400" value="100" style="width:90px" title="Planet size"/>
@@ -142,6 +153,7 @@ input[type=range].inlineSlider::-moz-range-thumb{width:14px;height:14px;border-r
     <span class="valLbl" id="lblZoom">1.00×</span>
     <div class="sep"></div>
   </div>
+  </div><!-- /toolbarOuter -->
 </div>
 
 <!-- Settings modal -->
@@ -1047,7 +1059,8 @@ function drawMoons(planet,px,py){
   const geoEarth=state.geoMode && planet.name==='Earth';
   const geoEven=state.geoMode && state.evenMode && planet.name==='Earth';
   const soloEarth=!state.geoMode && planet.name==='Earth';
-  const moonOrbitMult=geoEven?0.65:(geoEarth?1.5:(soloEarth?1.2:1.0));
+  const mobileFactor=cv.width<540 ? 0.55 : 1.0;
+  const moonOrbitMult=(geoEven?0.65:(geoEarth?1.5:(soloEarth?1.2:1.0)))*mobileFactor;
   const moonSizeMult=geoEven?2.0:(geoEarth?3.5:(soloEarth?2.5:1.0));
 
   const maxAu=Math.max(...moons.map(m=>m.au));
@@ -1417,9 +1430,11 @@ function drawSunArcOverlay(w,h){
   const wfs=state.widgetFontScale||1.0;
   const pad=12;
   const moonBoxH=34*2+52;
-  const bx=pad, by=pad+moonBoxH+6;
   // Fixed box width = longest-day arc diameter + padding
   const boxW=220, boxH=96;
+  const isMobile=w<540;
+  const bx=isMobile ? (w-boxW-pad) : pad;
+  const by=isMobile ? pad : (pad+moonBoxH+6);
   const horizonFromBottom=22;
 
   if(geoLat===null){
