@@ -49,6 +49,37 @@ input[type=range].inlineSlider::-moz-range-thumb{width:14px;height:14px;border-r
 
 /* Tooltip */
 [title]{cursor:default}
+
+/* ── Mobile / iPad responsive ──────────────────────────────── */
+@media (pointer:coarse){
+  .btn{height:40px;min-width:40px;font-size:13pt;padding:4px 10px}
+  #timeSlider::-webkit-slider-thumb{width:24px;height:24px}
+  #timeSlider::-moz-range-thumb{width:24px;height:24px}
+  input[type=range].inlineSlider::-webkit-slider-thumb{width:20px;height:20px}
+  input[type=range].inlineSlider::-moz-range-thumb{width:20px;height:20px}
+  #timeSlider{height:8px}
+  input[type=range].inlineSlider{height:8px}
+}
+@media (max-width:900px){
+  #toolbar{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;padding-bottom:4px;scrollbar-width:none}
+  #toolbar::-webkit-scrollbar{display:none}
+  .sep,.btn,.lbl,.valLbl,input[type=range].inlineSlider{flex-shrink:0}
+  .modal{min-width:unset;width:92vw;max-width:92vw;padding:16px}
+  #sliderRow{height:48px}
+}
+@media (max-width:540px){
+  #app{padding:2px;gap:3px}
+  .valLbl{font-size:8pt;min-width:26px}
+  .lbl{font-size:8pt}
+  #speedSlider{width:64px!important}
+  #volSlider{width:44px!important}
+  #warpSpeedSlider{width:48px!important}
+  #constScaleSlider{width:42px!important}
+  #planetSlider{width:60px!important}
+  #sunSlider{width:48px!important}
+  #moonSlider{width:48px!important}
+  #zoomSlider{width:80px!important}
+}
 </style>
 </head>
 <body>
@@ -85,6 +116,10 @@ input[type=range].inlineSlider::-moz-range-thumb{width:14px;height:14px;border-r
     <button class="btn" id="btnInfo"    title="Planet info panel"     >ⓘ</button>
     <button class="btn" id="btnSunLight" title="Sun lighting &amp; shadow">◑</button>
     <button class="btn" id="btnGeoLines" title="Geographic grid + rotation">⊞</button>
+    <button class="btn" id="btnWarp" title="Warp speed — fly through stars">✦</button>
+    <input type="range" class="inlineSlider" id="warpSpeedSlider" min="1" max="100" value="15" style="width:70px" title="Warp speed"/>
+    <button class="btn" id="btnConst" title="Northern hemisphere constellations">★</button>
+    <input type="range" class="inlineSlider" id="constScaleSlider" min="20" max="300" value="100" style="width:60px" title="Constellation scale"/>
     <div class="sep"></div>
     <span class="lbl">Align:</span>
     <button class="btn" id="btnPrevAlign" title="Previous alignment" style="min-width:26px;padding:0 4px">◄</button>
@@ -475,6 +510,10 @@ let state={
   showMarks:true,
   showSunLight:false,
   showGeoLines:false,
+  warpMode:false,
+  warpSpeed:0.15,
+  showConstellations:false,
+  constScale:1.0,
   geoLineWidth:1.0,
   geoLineColor:'#64b4ff',
   geoLineDensity:30,
@@ -523,6 +562,10 @@ function saveSettings(){
     showMarks:state.showMarks,
     showSunLight:state.showSunLight,
     showGeoLines:state.showGeoLines,
+    warpMode:false,  // never persist warp active
+    warpSpeed:Math.round(state.warpSpeed*100),
+    showConstellations:state.showConstellations,
+    constScale:Math.round(state.constScale*100),
     geoLineWidth:Math.round(state.geoLineWidth*10),
     geoLineColor:state.geoLineColor,
     geoLineDensity:state.geoLineDensity,
@@ -562,6 +605,9 @@ function loadSettings(){
     if(s.showMarks!=null) state.showMarks=!!s.showMarks;
     if(s.showSunLight!=null) state.showSunLight=!!s.showSunLight;
     if(s.showGeoLines!=null) state.showGeoLines=!!s.showGeoLines;
+    if(s.warpSpeed!=null) state.warpSpeed=s.warpSpeed/100;
+    if(s.showConstellations!=null) state.showConstellations=!!s.showConstellations;
+    if(s.constScale!=null) state.constScale=s.constScale/100;
     if(s.geoLineWidth!=null) state.geoLineWidth=s.geoLineWidth/10;
     if(s.geoLineColor) state.geoLineColor=s.geoLineColor;
     if(s.geoLineDensity!=null) state.geoLineDensity=s.geoLineDensity;
@@ -700,14 +746,16 @@ function draw(){
   ctx.fillStyle='#06060f';
   ctx.fillRect(0,0,w,h);
 
-  // Stars
+  // Stars (suppressed during warp — tickWarp draws animated versions instead)
   if(!starsCache) starsCache=buildStars(w,h);
-  const starOp=state.starOpacity||1.0;
-  for(const s of starsCache){
-    ctx.beginPath();
-    ctx.arc(s.x,s.y,s.s,0,Math.PI*2);
-    ctx.fillStyle=`rgba(${s.r},${s.g},${s.b},${Math.min(1,s.a/255*starOp)})`;
-    ctx.fill();
+  if(!state.warpMode){
+    const starOp=state.starOpacity||1.0;
+    for(const s of starsCache){
+      ctx.beginPath();
+      ctx.arc(s.x,s.y,s.s,0,Math.PI*2);
+      ctx.fillStyle=`rgba(${s.r},${s.g},${s.b},${Math.min(1,s.a/255*starOp)})`;
+      ctx.fill();
+    }
   }
 
   const cx=w/2, cy=h/2;
@@ -813,6 +861,9 @@ function draw(){
   drawMoonPhaseOverlay(w,h);
   drawSunArcOverlay(w,h);
   if(state.showInfo && state.selectedPlanet) drawInfoPanel(w,h);
+  // Constellations overlay drawn last so labels appear on top
+  // Suppress hover highlight during playback so it doesn't interfere with animation
+  if(state.showConstellations) drawConstellations(w,h,state.playing?null:constMouseX,state.playing?null:constMouseY);
 }
 
 function drawOrbit(r){
@@ -1753,6 +1804,10 @@ function syncAllUI(){
   setBtn('btnMarks',state.showMarks);
   setBtn('btnSunLight',state.showSunLight);
   setBtn('btnGeoLines',state.showGeoLines);
+  setBtn('btnWarp',state.warpMode);
+  setBtn('btnConst',state.showConstellations);
+  document.getElementById('warpSpeedSlider').value=Math.round((state.warpSpeed||0.15)*100);
+  document.getElementById('constScaleSlider').value=Math.round((state.constScale||1)*100);
   // Zodiac & sector & trail buttons only in geo mode
   document.getElementById('btnZodiac').style.display=state.geoMode?'':'none';
   document.getElementById('btnSectors').style.display=state.geoMode?'':'none';
@@ -2001,6 +2056,110 @@ toggleBtn('btnInfo','showInfo');
 toggleBtn('btnMarks','showMarks');
 toggleBtn('btnSunLight','showSunLight');
 toggleBtn('btnGeoLines','showGeoLines');
+
+// Constellation button
+document.getElementById('btnConst').addEventListener('click',()=>{
+  state.showConstellations=!state.showConstellations;
+  setBtn('btnConst',state.showConstellations);
+  draw(); saveSettings();
+});
+
+// Constellation scale slider
+document.getElementById('constScaleSlider').addEventListener('input',e=>{
+  state.constScale=parseInt(e.target.value)/100;
+  if(state.showConstellations) draw();
+  saveSettings();
+});
+
+// Warp speed slider
+document.getElementById('warpSpeedSlider').addEventListener('input',e=>{
+  state.warpSpeed=parseInt(e.target.value)/100;
+  saveSettings();
+});
+
+// Warp button
+document.getElementById('btnWarp').addEventListener('click',()=>{
+  state.warpMode=!state.warpMode;
+  setBtn('btnWarp',state.warpMode);
+  if(state.warpMode){
+    warpStars=null;
+    warpLastTime=null;
+    warpAnimId=requestAnimationFrame(tickWarp);
+  } else {
+    if(warpAnimId){cancelAnimationFrame(warpAnimId);warpAnimId=null;}
+    warpLastTime=null;
+    draw();
+  }
+  saveSettings();
+});
+
+// Constellation mouse tracking
+cv.addEventListener('mousemove',e=>{
+  if(!state.showConstellations){constMouseX=null;constMouseY=null;return;}
+  const rect=cv.getBoundingClientRect();
+  constMouseX=e.clientX-rect.left;
+  constMouseY=e.clientY-rect.top;
+  if(!state.warpMode) draw();
+});
+cv.addEventListener('mouseleave',()=>{
+  constMouseX=null; constMouseY=null;
+  if(state.showConstellations&&!state.warpMode) draw();
+});
+
+// ── Touch support (mobile / iPad) ────────────────────────────
+(function(){
+  let _tx=null,_ty=null,_moved=false,_pinchDist=null;
+  function pinchLen(t){return Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);}
+  cv.addEventListener('touchstart',e=>{
+    e.preventDefault();
+    const r=cv.getBoundingClientRect();
+    if(e.touches.length===1){
+      _tx=e.touches[0].clientX-r.left; _ty=e.touches[0].clientY-r.top;
+      _moved=false; _pinchDist=null;
+    } else if(e.touches.length===2){
+      _pinchDist=pinchLen(e.touches); _tx=null;
+    }
+  },{passive:false});
+  cv.addEventListener('touchmove',e=>{
+    e.preventDefault();
+    const r=cv.getBoundingClientRect();
+    if(e.touches.length===2){
+      const d=pinchLen(e.touches);
+      if(_pinchDist!==null){
+        const zs=document.getElementById('zoomSlider');
+        let v=Math.round(parseFloat(zs.value)*(d/_pinchDist));
+        v=Math.max(parseInt(zs.min),Math.min(parseInt(zs.max),v));
+        zs.value=v; state.zoom=v/100;
+        document.getElementById('lblZoom').textContent=state.zoom.toFixed(2)+'×';
+        draw(); saveSettings();
+      }
+      _pinchDist=d; _tx=null;
+    } else if(e.touches.length===1){
+      const x=e.touches[0].clientX-r.left, y=e.touches[0].clientY-r.top;
+      if(_tx!==null&&Math.hypot(x-_tx,y-_ty)>5) _moved=true;
+      if(state.showConstellations){constMouseX=x;constMouseY=y;if(!state.warpMode)draw();}
+      _tx=x; _ty=y;
+    }
+  },{passive:false});
+  cv.addEventListener('touchend',e=>{
+    e.preventDefault();
+    if(e.changedTouches.length===1&&!_moved&&_tx!==null){
+      let best=null,bestDist=Infinity;
+      for(const [name,pos] of Object.entries(planetScreenPos)){
+        const dist=Math.hypot(_tx-pos.x,_ty-pos.y);
+        const hitR=Math.max(pos.r*2.2,24);
+        if(dist<=hitR&&dist<bestDist){bestDist=dist;best=name;}
+      }
+      state.selectedPlanet=best===state.selectedPlanet?null:best;
+      draw();
+    }
+    if(e.touches.length===0){
+      constMouseX=null;constMouseY=null;
+      if(state.showConstellations&&!state.warpMode)draw();
+      _pinchDist=null;
+    }
+  },{passive:false});
+})();
 
 // Solar term nav
 document.getElementById('btnPrevST').addEventListener('click',()=>{

@@ -230,3 +230,221 @@ const ASTRO_PLANET_SIGN = {
     ],
   },
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WARP STARS  (animation state + render — references cv/ctx/state/draw from solar_system.html)
+// ─────────────────────────────────────────────────────────────────────────────
+let warpStars=null;
+let warpAnimId=null;
+let warpLastTime=null;
+
+function buildWarpStars(){
+  // Build from starsCache so the same dots the user sees as bg stars are animated
+  if(!starsCache && cv) starsCache=buildStars(cv.width,cv.height);
+  if(!starsCache) return [];
+  const arr=[];
+  const cx=cv.width/2, cy=cv.height/2;
+  const maxR=Math.hypot(cx,cy);
+  for(const s of starsCache){
+    const dx=s.x-cx, dy=s.y-cy;
+    const angle=Math.atan2(dy,dx);
+    const dist=Math.max(0.02, Math.hypot(dx,dy)/maxR);
+    const speed=0.003+Math.random()*0.006;
+    arr.push({angle, dist, speed, r:s.r, g:s.g, b:s.b, a:s.a, size:s.s});
+  }
+  return arr;
+}
+
+function tickWarp(ts){
+  if(!state.warpMode){ warpAnimId=null; warpLastTime=null; return; }
+  const w=cv.width, h=cv.height;
+  if(!w||!h){ warpAnimId=requestAnimationFrame(tickWarp); return; }
+  if(warpLastTime===null) warpLastTime=ts;
+  const dt=Math.min(ts-warpLastTime,80);
+  warpLastTime=ts;
+
+  // Rebuild warp particles if starsCache was rebuilt (e.g. settings changed)
+  if(!warpStars||warpStars.length!==(starsCache||[]).length) warpStars=buildWarpStars();
+
+  // Draw scene (static stars are suppressed inside draw() when warpMode is on)
+  draw();
+
+  // Overlay animated bg-star dots — slow outward drift from centre
+  const cx=w/2, cy=h/2;
+  const maxR=Math.hypot(cx,cy);
+  const warpFactor=(state.warpSpeed||0.15);
+  const starOp=state.starOpacity||1.0;
+  ctx.save();
+  for(const s of warpStars){
+    s.dist+=s.speed*warpFactor*dt/16;
+    if(s.dist>1.4){
+      s.dist=0.005+Math.random()*0.02;
+      s.speed=0.003+Math.random()*0.006;
+      s.angle=Math.random()*Math.PI*2;
+    }
+    const r=s.dist*maxR;
+    const sx=cx+r*Math.cos(s.angle);
+    const sy=cy+r*Math.sin(s.angle);
+    ctx.beginPath();
+    ctx.arc(sx,sy,s.size,0,Math.PI*2);
+    ctx.fillStyle=`rgba(${s.r},${s.g},${s.b},${Math.min(1,s.a/255*starOp).toFixed(2)})`;
+    ctx.fill();
+  }
+  ctx.restore();
+
+  warpAnimId=requestAnimationFrame(tickWarp);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NORTHERN CONSTELLATIONS
+// Stars: [ra_hours, dec_degrees] — azimuthal equidistant projection from North Pole.
+// Visible range: dec -30° to 90° (120° span).
+// ─────────────────────────────────────────────────────────────────────────────
+const CONSTELLATIONS_NORTH=[
+  {name:'Ursa Major',color:'#a0d0ff',stars:[
+    [11.062,61.75],[11.897,53.69],[12.257,57.03],[12.900,55.96],[13.398,54.93],[13.792,49.31],[13.524,49.01],
+    [10.285,66.99],[9.849,59.04]
+  ],lines:[[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,3],[0,7],[7,8]]},
+  {name:'Ursa Minor',color:'#80c8ff',stars:[
+    [2.530,89.26],[14.845,74.16],[15.734,77.79],[16.292,75.76],[17.537,86.59],[16.766,82.04],[15.345,71.83]
+  ],lines:[[0,4],[4,5],[5,1],[1,6],[6,2],[2,3],[3,0]]},
+  {name:'Cassiopeia',color:'#ffb0d0',stars:[
+    [0.675,56.54],[1.103,60.72],[0.945,60.72],[1.431,60.24],[0.153,59.15]
+  ],lines:[[4,0],[0,1],[1,2],[2,3]]},
+  {name:'Orion',color:'#ffd080',stars:[
+    [5.242,-8.20],[5.533,-0.30],[5.919,7.41],[5.679,1.94],[5.581,-1.94],[5.796,-9.67],[6.127,14.21],
+    [5.419,6.35]
+  ],lines:[[0,1],[1,2],[2,3],[3,4],[4,5],[5,0],[1,7],[7,6],[6,2],[3,5]]},
+  {name:'Perseus',color:'#d0b0ff',stars:[
+    [3.405,49.86],[3.715,47.79],[3.080,53.51],[3.964,40.01],[4.115,50.36],[2.731,55.90]
+  ],lines:[[5,2],[2,0],[0,1],[1,3],[3,4],[4,1],[0,4]]},
+  {name:'Auriga',color:'#50e8a0',stars:[
+    [5.278,45.99],[5.108,41.23],[5.992,54.29],[5.440,43.82],[6.002,44.95],[4.900,33.17]
+  ],lines:[[0,1],[1,5],[5,3],[3,0],[0,2],[2,4],[4,0]]},
+  {name:'Gemini',color:'#ffe060',stars:[
+    [7.755,28.03],[7.585,31.89],[6.628,16.40],[6.754,12.90],[7.068,20.57],[7.301,21.98],
+    [6.383,22.51],[6.247,22.51]
+  ],lines:[[0,5],[5,4],[4,3],[3,2],[1,5],[1,6],[6,7],[7,2]]},
+  {name:'Leo',color:'#ffa040',stars:[
+    [10.140,11.97],[10.332,19.84],[9.879,23.77],[10.123,16.77],[11.818,14.57],[11.235,20.52],
+    [9.764,26.01]
+  ],lines:[[6,2],[2,1],[1,3],[3,0],[0,1],[0,4],[4,5],[5,1]]},
+  {name:'Virgo',color:'#c8f080',stars:[
+    [13.420,-11.16],[12.694,-1.45],[12.332,-0.67],[13.036,-5.54],[12.926,3.40],[13.578,0.59]
+  ],lines:[[2,4],[4,1],[1,3],[3,0],[0,5],[5,3]]},
+  {name:'Bootes',color:'#ff9060',stars:[
+    [14.261,19.18],[14.750,27.07],[14.534,30.37],[14.686,16.42],[14.420,13.72],[13.911,18.40]
+  ],lines:[[5,0],[0,4],[4,3],[3,0],[0,1],[1,2],[2,0]]},
+  {name:'Corona Borealis',color:'#90d0ff',stars:[
+    [15.578,26.71],[15.464,29.11],[15.712,26.30],[15.549,31.36],[15.702,28.27],[15.827,26.88]
+  ],lines:[[3,1],[1,0],[0,4],[4,2],[2,5]]},
+  {name:'Hercules',color:'#e080ff',stars:[
+    [17.244,14.39],[16.503,21.49],[17.006,30.93],[16.714,31.60],[16.365,19.15],[17.394,37.15],
+    [16.688,38.92],[17.657,46.01]
+  ],lines:[[4,1],[1,0],[0,2],[2,3],[3,1],[3,6],[6,5],[5,7],[7,2]]},
+  {name:'Lyra',color:'#80ffff',stars:[
+    [18.615,38.78],[18.835,33.36],[18.908,36.90],[18.746,37.60],[18.913,39.67]
+  ],lines:[[0,3],[3,2],[2,1],[1,4],[4,0],[3,4]]},
+  {name:'Cygnus',color:'#b0e0ff',stars:[
+    [20.691,45.28],[20.370,40.26],[19.495,27.96],[21.216,30.23],[19.938,35.08],[21.736,28.74]
+  ],lines:[[0,1],[1,4],[4,2],[0,3],[3,5],[1,3]]},
+  {name:'Aquila',color:'#ffc850',stars:[
+    [19.846,8.87],[19.771,6.41],[19.677,10.61],[19.425,3.11],[20.189,0.82]
+  ],lines:[[2,0],[0,1],[1,3],[0,4]]},
+  {name:'Draco',color:'#90ffa0',stars:[
+    [17.944,51.49],[17.507,52.30],[16.400,61.51],[15.415,58.97],[14.075,64.38],[12.558,69.79],
+    [11.524,69.33],[17.146,65.71],[18.351,72.73],[17.694,68.79]
+  ],lines:[[0,7],[7,8],[8,9],[9,1],[1,0],[1,2],[2,3],[3,4],[4,5],[5,6]]},
+  {name:'Cepheus',color:'#d0a0ff',stars:[
+    [22.829,70.56],[22.251,58.20],[23.656,77.63],[22.181,70.56],[21.310,62.59]
+  ],lines:[[0,3],[3,2],[2,0],[0,1],[1,4],[4,3]]},
+  {name:'Andromeda',color:'#ffb8a0',stars:[
+    [0.140,29.09],[0.655,30.86],[1.162,35.62],[2.065,42.33],[23.063,42.33]
+  ],lines:[[4,0],[0,1],[1,2],[2,3]]},
+  {name:'Pegasus',color:'#ffd8b0',stars:[
+    [0.140,29.09],[22.691,10.83],[21.744,9.87],[23.079,15.21],[23.063,28.08]
+  ],lines:[[1,2],[2,3],[3,4],[4,0],[0,1]]},
+  {name:'Scorpius',color:'#ff7070',stars:[
+    [16.490,-26.43],[16.006,-22.62],[16.352,-25.60],[16.836,-34.29],[17.144,-43.24],
+    [17.622,-42.99],[17.708,-39.03],[17.560,-37.10]
+  ],lines:[[1,0],[0,2],[2,3],[3,4],[4,5],[5,6],[6,7]]}
+];
+
+// Project RA/Dec to canvas XY aligned with the zodiac sectors.
+// RA 0h = Aries = right side of canvas; RA increases counter-clockwise,
+// matching the ecliptic-longitude convention used for planet drawing.
+// dec=90 -> centre, dec=-30 -> edge (120° span = min(w,h)*0.48*scale).
+function projectStarToCanvas(ra_h, dec_deg, w, h, scale){
+  const maxR=Math.min(w,h)*0.48*(scale||1.0);
+  const r=(90-dec_deg)/120*maxR;
+  const angle=ra_h*15*Math.PI/180;
+  return {x:w/2+r*Math.cos(angle), y:h/2-r*Math.sin(angle)};
+}
+
+function drawConstellations(w, h, mouseX, mouseY){
+  const sc=state.constScale||1.0;
+  let hoveredConst=null;
+
+  // Find hovered constellation
+  if(mouseX!==null){
+    outer:for(const c of CONSTELLATIONS_NORTH){
+      for(const [ra,dec] of c.stars){
+        const {x,y}=projectStarToCanvas(ra,dec,w,h,sc);
+        if(Math.hypot(mouseX-x,mouseY-y)<20){hoveredConst=c.name;break outer;}
+      }
+    }
+  }
+
+  ctx.save();
+  for(const c of CONSTELLATIONS_NORTH){
+    const isHovered=(c.name===hoveredConst);
+    const pts=c.stars.map(([ra,dec])=>projectStarToCanvas(ra,dec,w,h,sc));
+    const {r,g,b}=hexToRgb(c.color);
+    const lineAlpha=isHovered?0.88:0.28;
+    const starAlpha=isHovered?1.0:0.55;
+
+    // Lines
+    ctx.strokeStyle=`rgba(${r},${g},${b},${lineAlpha})`;
+    ctx.lineWidth=isHovered?1.8:0.9;
+    ctx.setLineDash(isHovered?[]:[3,4]);
+    for(const [ai,bi] of c.lines){
+      if(ai>=pts.length||bi>=pts.length) continue;
+      ctx.beginPath();
+      ctx.moveTo(pts[ai].x,pts[ai].y);
+      ctx.lineTo(pts[bi].x,pts[bi].y);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
+    // Stars
+    for(const p of pts){
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,isHovered?3.5:2.0,0,Math.PI*2);
+      ctx.fillStyle=`rgba(${r},${g},${b},${starAlpha})`;
+      ctx.fill();
+      if(isHovered){
+        ctx.strokeStyle='rgba(255,255,255,0.6)';
+        ctx.lineWidth=0.8;
+        ctx.stroke();
+      }
+    }
+
+    // Name label on hover
+    if(isHovered){
+      let cx2=0,cy2=0;
+      for(const p of pts){cx2+=p.x;cy2+=p.y;}
+      cx2/=pts.length; cy2/=pts.length;
+      const txt=c.name;
+      ctx.font="bold 13px 'Segoe UI',Arial";
+      ctx.textAlign='center';
+      ctx.textBaseline='bottom';
+      ctx.fillStyle='rgba(0,0,0,0.75)';
+      ctx.fillText(txt,cx2+1,cy2-6);
+      ctx.fillStyle=`rgba(${r},${g},${b},1)`;
+      ctx.fillText(txt,cx2,cy2-7);
+    }
+  }
+  ctx.restore();
+}
+
+let constMouseX=null, constMouseY=null;
