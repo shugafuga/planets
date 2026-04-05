@@ -17,7 +17,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#06060f;color:#c8d8f
 #sliderRow{display:flex;align-items:center;gap:6px;height:52px}
 #sliderRow label{color:#80a0c0;font-size:9pt;white-space:nowrap;cursor:pointer;user-select:none}
 #sliderRow label:hover{color:#a0c8f0}
-#sliderWrap{flex:1;position:relative;height:52px}
+#sliderWrap{flex:1;position:relative;height:52px;min-width:0}
 #timeSlider{-webkit-appearance:none;appearance:none;width:100%;height:6px;background:#1a2a4a;border-radius:3px;outline:none;cursor:pointer;position:absolute;top:50%;transform:translateY(-50%)}
 #timeSlider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;background:#4a8ad0;border:1px solid #6aaaf0;cursor:pointer}
 #timeSlider::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#4a8ad0;border:1px solid #6aaaf0;cursor:pointer}
@@ -78,7 +78,13 @@ input[type=range].inlineSlider::-moz-range-thumb{width:14px;height:14px;border-r
   .btn{height:34px!important;min-width:34px!important;font-size:12pt!important;padding:2px 6px!important}
   .valLbl{font-size:8pt;min-width:24px}
   .lbl{font-size:8pt}
-  #sliderRow{height:40px!important}
+  /* Two-row time slider: date labels top, slider full-width bottom */
+  #sliderRow{height:auto!important;flex-wrap:wrap;gap:3px 4px;padding:2px 0}
+  #lblMin{order:1}
+  #btnPrevST{order:2}
+  #btnNextST{order:3}
+  #lblMax{order:4;margin-left:auto}
+  #sliderWrap{order:5;flex-basis:100%;height:36px}
   #speedSlider{width:64px!important}
   #volSlider{width:44px!important}
   #warpSpeedSlider{width:48px!important}
@@ -86,13 +92,26 @@ input[type=range].inlineSlider::-moz-range-thumb{width:14px;height:14px;border-r
   #planetSlider{width:72px!important}
   #sunSlider{width:56px!important}
   #moonSlider{width:56px!important}
+  #moonOrbitSlider{width:48px!important}
   #zoomSlider{width:90px!important}
 }
+
+/* Planet info panel — HTML version shown below canvas on mobile */
+#infoPanelDiv{display:none;padding:8px 12px;border-radius:8px;border:1.5px solid rgba(100,140,200,0.45);background:rgba(10,18,40,0.93);flex-shrink:0;overflow-y:auto;max-height:38vh}
+.ipt{font-weight:bold;font-size:13px;margin-bottom:5px;color:#a0c8f0}
+.ipr{display:flex;justify-content:space-between;gap:8px;font-size:11px;padding:1px 0;border-bottom:1px solid rgba(60,90,140,0.25)}
+.ipk{color:rgba(140,170,210,0.82);flex-shrink:0}
+.ipv{font-weight:bold;color:rgba(220,235,255,0.94);text-align:right}
+.ipast{margin-top:6px;padding:5px 8px;border-radius:6px;border:1px solid rgba(100,140,200,0.3);font-size:11px;color:rgba(190,210,240,0.88);line-height:1.5}
+.ipasign{font-weight:bold;display:block;margin-bottom:2px}
 </style>
 </head>
 <body>
 <div id="app">
   <div id="canvasWrap"><canvas id="cv"></canvas></div>
+
+  <!-- Planet info panel (mobile: below canvas, desktop: drawn on canvas) -->
+  <div id="infoPanelDiv"></div>
 
   <!-- Time slider row -->
   <div id="sliderRow">
@@ -120,6 +139,7 @@ input[type=range].inlineSlider::-moz-range-thumb{width:14px;height:14px;border-r
     <button class="btn" id="btnSettings" title="Settings">⚙</button>
     <div class="tbBreak"></div>
     <!-- Row 2: view toggles + warp + constellations -->
+    <button class="btn active" id="btnLabels"  title="Toggle planet &amp; zodiac names">𝐀</button>
     <button class="btn active" id="btnEven"    title="Equal orbit spacing"  >≡</button>
     <button class="btn" id="btnGeo"     title="Earth-centric view"    >♁</button>
     <button class="btn" id="btnZodiac"   title="Toggle zodiac ring"    >♈</button>
@@ -150,6 +170,9 @@ input[type=range].inlineSlider::-moz-range-thumb{width:14px;height:14px;border-r
     <span class="lbl" title="Moon size scale">☽</span>
     <input type="range" class="inlineSlider" id="moonSlider" min="25" max="400" value="100" style="width:70px" title="Moon size"/>
     <span class="valLbl" id="lblMoon">1.00×</span>
+    <span class="lbl" title="Moon orbit scale">⬤</span>
+    <input type="range" class="inlineSlider" id="moonOrbitSlider" min="10" max="300" value="100" style="width:60px" title="Moon orbit size"/>
+    <span class="valLbl" id="lblMoonOrbit">1.00×</span>
     <div class="sep"></div>
     <span class="lbl" id="lblZoomText">Zoom:</span>
     <input type="range" class="inlineSlider" id="zoomSlider" min="100" max="2500" value="100" style="width:120px" title="Zoom"/>
@@ -538,6 +561,8 @@ let state={
   planetScale:1.0,
   sunScale:1.0,
   moonScale:1.0,
+  moonOrbitScale:1.0,
+  showLabels:true,
   zodiacFontScale:1.0,
   minAlignPlanets:3,
   lang:'en',
@@ -590,6 +615,8 @@ function saveSettings(){
     planetScale:Math.round(state.planetScale*100),
     sunScale:Math.round(state.sunScale*100),
     moonScale:Math.round(state.moonScale*100),
+    moonOrbitScale:Math.round(state.moonOrbitScale*100),
+    showLabels:state.showLabels,
     zodiacFontScale:Math.round(state.zodiacFontScale*100),
     minAlignPlanets:state.minAlignPlanets,
     lang:state.lang,
@@ -632,6 +659,8 @@ function loadSettings(){
     if(s.planetScale!=null) state.planetScale=s.planetScale/100;
     if(s.sunScale!=null) state.sunScale=s.sunScale/100;
     if(s.moonScale!=null) state.moonScale=s.moonScale/100;
+    if(s.moonOrbitScale!=null) state.moonOrbitScale=s.moonOrbitScale/100;
+    if(s.showLabels!=null) state.showLabels=!!s.showLabels;
     if(s.zodiacFontScale!=null) state.zodiacFontScale=s.zodiacFontScale/100;
     if(s.minAlignPlanets!=null) state.minAlignPlanets=s.minAlignPlanets;
     if(s.lang) state.lang=s.lang;
@@ -875,7 +904,8 @@ function draw(){
   drawDateLabel(w,h);
   drawMoonPhaseOverlay(w,h);
   drawSunArcOverlay(w,h);
-  if(state.showInfo && state.selectedPlanet) drawInfoPanel(w,h);
+  if(state.showInfo && state.selectedPlanet && w>=540) drawInfoPanel(w,h);
+  updateInfoPanelHtml(w);
   // Constellations overlay drawn last so labels appear on top
   // Suppress hover highlight during playback so it doesn't interfere with animation
   if(state.showConstellations) drawConstellations(w,h,state.playing?null:constMouseX,state.playing?null:constMouseY);
@@ -966,10 +996,12 @@ function drawPlanet(planet,px,py,scale,evenStep){
   drawMoons(planet,px,py);
 
   // Label
-  const _pnL=LOCALE[state.lang]||LOCALE.en;
-  ctx.fillStyle=lighten(color,60);
-  ctx.font=`10px 'Segoe UI',Arial,sans-serif`;
-  ctx.fillText(_pnL.planetNames[planet.name]||planet.name, px+r+3, py-r);
+  if(state.showLabels){
+    const _pnL=LOCALE[state.lang]||LOCALE.en;
+    ctx.fillStyle=lighten(color,60);
+    ctx.font=`10px 'Segoe UI',Arial,sans-serif`;
+    ctx.fillText(_pnL.planetNames[planet.name]||planet.name, px+r+3, py-r);
+  }
 }
 
 // Draw latitude/longitude grid — top-down polar (North Pole) projection
@@ -1063,7 +1095,7 @@ function drawMoons(planet,px,py){
   const geoEven=state.geoMode && state.evenMode && planet.name==='Earth';
   const soloEarth=!state.geoMode && planet.name==='Earth';
   const mobileFactor=cv.width<540 ? 0.55 : 1.0;
-  const moonOrbitMult=(geoEven?0.65:(geoEarth?1.5:(soloEarth?1.2:1.0)))*mobileFactor;
+  const moonOrbitMult=(geoEven?0.65:(geoEarth?1.5:(soloEarth?1.2:1.0)))*mobileFactor*(state.moonOrbitScale||1.0);
   const moonSizeMult=geoEven?2.0:(geoEarth?3.5:(soloEarth?2.5:1.0));
 
   const maxAu=Math.max(...moons.map(m=>m.au));
@@ -1172,9 +1204,11 @@ function drawZodiac(w,h){
     ctx.fillStyle=`rgba(${r},${g},${b},0.90)`;
     ctx.font=`${Math.max(9,Math.round(symH))}px 'Segoe UI Symbol','Segoe UI Emoji',Arial`;
     ctx.fillText(ZODIAC[i].symbol+'\uFE0E',0,0);
-    ctx.fillStyle=`rgba(${r},${g},${b},0.67)`;
-    ctx.font=`${Math.max(6,Math.round(nameH))}px 'Segoe UI',Arial`;
-    ctx.fillText(names[i]||ZODIAC[i].name,0,nameH+2);
+    if(state.showLabels){
+      ctx.fillStyle=`rgba(${r},${g},${b},0.67)`;
+      ctx.font=`${Math.max(6,Math.round(nameH))}px 'Segoe UI',Arial`;
+      ctx.fillText(names[i]||ZODIAC[i].name,0,nameH+2);
+    }
     ctx.restore();
   }
 }
@@ -1581,6 +1615,56 @@ function drawMoonLitRegion(mcx,mcy,diskR,angle){
   ctx.restore();
 }
 
+function updateInfoPanelHtml(w){
+  const div=document.getElementById('infoPanelDiv');
+  if(!div) return;
+  if((w||cv.width)>=540 || !state.showInfo || !state.selectedPlanet){
+    div.style.display='none'; return;
+  }
+  const planet=PLANETS.find(p=>p.name===state.selectedPlanet);
+  if(!planet){div.style.display='none'; return;}
+
+  const L=LOCALE[state.lang]||LOCALE.en;
+  const lbl=L.infoPanelLabels;
+  const earth=PLANETS[2];
+  let distStr='—';
+  if(planet.name!=='Earth'){
+    const angE=planetAngleDeg(earth,state.currentDate)*Math.PI/180;
+    const angP=planetAngleDeg(planet,state.currentDate)*Math.PI/180;
+    const ex=earth.au*Math.cos(angE),ey=earth.au*Math.sin(angE);
+    const px2=planet.au*Math.cos(angP),py2=planet.au*Math.sin(angP);
+    const distAu=Math.hypot(px2-ex,py2-ey);
+    const distKm=distAu*149597870.7;
+    distStr=distKm>=1e6?`${(distKm/1e6).toFixed(2)} M km`:`${Math.round(distKm).toLocaleString()} km`;
+  }
+  const spinStr=planet.spin_days<0?`${Math.abs(planet.spin_days).toFixed(3)} d (retro)`:`${planet.spin_days.toFixed(3)} d`;
+  const rows=[
+    [lbl[0],`${planet.period.toFixed(1)} days`],
+    [lbl[1],`${planet.radius_km.toLocaleString()} km`],
+    [lbl[2],`${planet.orbital_speed_km_s} km/s`],
+    [lbl[3],spinStr],
+    [lbl[4],`${planet.au.toFixed(2)} AU`],
+    [lbl[5],distStr],
+  ];
+  const pName=L.planetNames[planet.name]||planet.name;
+  const c=planet.color;
+  const rowsHtml=rows.map(([k,v])=>`<div class="ipr"><span class="ipk">${k}:</span><span class="ipv">${v}</span></div>`).join('');
+
+  let astroHtml='';
+  if(state.showZodiac||state.showSectors){
+    const zi=Math.floor(geoEclLonDeg(planet,state.currentDate)/30);
+    const signName=((LOCALE[state.lang]||LOCALE.en).zodiacNames||ZODIAC_NAMES_EN)[zi];
+    const astroTxt=(ASTRO_PLANET_SIGN[state.lang]||ASTRO_PLANET_SIGN.en)[planet.name]?.[zi]||'';
+    if(astroTxt&&signName){
+      astroHtml=`<div class="ipast" style="border-color:${c}55"><span class="ipasign" style="color:${c}">${pName} in ${signName}</span>${astroTxt}</div>`;
+    }
+  }
+
+  div.style.borderColor=c+'99';
+  div.style.display='block';
+  div.innerHTML=`<div class="ipt" style="color:${lighten(c,55)}">${pName}</div>${rowsHtml}${astroHtml}`;
+}
+
 function drawInfoPanel(w,h){
   const planet=PLANETS.find(p=>p.name===state.selectedPlanet);
   if(!planet) return;
@@ -1768,7 +1852,7 @@ function drawSliderOverlay(){
         const showLbl=showAllMonths||(showQtrMonths&&[4,7,10].includes(mo));
         sctx.strokeStyle='rgba(110,155,220,0.72)'; sctx.lineWidth=1.0;
         sctx.beginPath(); sctx.moveTo(x,gy-7); sctx.lineTo(x,gy+7); sctx.stroke();
-        if(showLbl){
+        if(showLbl && w>=400){
           const ABBR=(LOCALE[state.lang]||LOCALE.en).monthsAbbr;
           sctx.fillStyle='rgba(130,170,225,0.88)';
           sctx.font=`${Math.max(6,Math.round(7*state.monthFontScale))}px 'Segoe UI',Arial`;
@@ -1821,7 +1905,11 @@ function syncAllUI(){
   const mv=Math.round(state.moonScale*100);
   document.getElementById('moonSlider').value=mv;
   document.getElementById('lblMoon').textContent=(state.moonScale).toFixed(2)+'×';
+  const mov=Math.round((state.moonOrbitScale||1)*100);
+  document.getElementById('moonOrbitSlider').value=mov;
+  document.getElementById('lblMoonOrbit').textContent=(state.moonOrbitScale||1).toFixed(2)+'×';
   // Buttons
+  setBtn('btnLabels',state.showLabels);
   setBtn('btnEven',state.evenMode);
   setBtn('btnGeo',state.geoMode);
   setBtn('btnZodiac',state.showZodiac);
@@ -1911,6 +1999,12 @@ document.getElementById('moonSlider').addEventListener('input',e=>{
   document.getElementById('lblMoon').textContent=state.moonScale.toFixed(2)+'×';
   draw(); saveSettings();
 });
+document.getElementById('moonOrbitSlider').addEventListener('input',e=>{
+  state.moonOrbitScale=parseInt(e.target.value)/100;
+  document.getElementById('lblMoonOrbit').textContent=state.moonOrbitScale.toFixed(2)+'×';
+  draw(); saveSettings();
+});
+toggleBtn('btnLabels','showLabels');
 
 // Play
 let animTimer=null;
