@@ -7,7 +7,7 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{width:100%;height:100%;overflow:hidden;background:#06060f;color:#c8d8f0;font-family:'Segoe UI',Arial,sans-serif}
-#app{display:flex;flex-direction:column;height:100vh;padding:8px;gap:6px}
+#app{display:flex;flex-direction:column;height:100vh;height:100dvh;padding:8px;gap:6px}
 
 /* Canvas */
 #canvasWrap{flex:1;position:relative;min-height:0}
@@ -1171,7 +1171,7 @@ function drawZodiac(w,h){
     ctx.textAlign='center';
     ctx.fillStyle=`rgba(${r},${g},${b},0.90)`;
     ctx.font=`${Math.max(9,Math.round(symH))}px 'Segoe UI Symbol','Segoe UI Emoji',Arial`;
-    ctx.fillText(ZODIAC[i].symbol,0,0);
+    ctx.fillText(ZODIAC[i].symbol+'\uFE0E',0,0);
     ctx.fillStyle=`rgba(${r},${g},${b},0.67)`;
     ctx.font=`${Math.max(6,Math.round(nameH))}px 'Segoe UI',Arial`;
     ctx.fillText(names[i]||ZODIAC[i].name,0,nameH+2);
