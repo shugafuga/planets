@@ -69,13 +69,16 @@ input[type=range].inlineSlider::-moz-range-thumb{width:14px;height:14px;border-r
   #sliderRow{height:48px}
 }
 @media (max-width:540px){
-  #app{padding:2px;gap:3px}
-  /* Multi-row toolbar */
-  #toolbar{flex-wrap:wrap;overflow:visible;padding-bottom:2px;gap:3px 3px;align-items:center}
+  #app{padding:2px;gap:2px}
+  /* Multi-row toolbar — compact buttons so 3 rows fit in viewport */
+  #toolbar{flex-wrap:wrap;overflow:visible;padding-bottom:2px;gap:2px 2px;align-items:center}
   .tbBreak{display:block;flex-basis:100%;width:100%;height:0;margin:0}
   .sep{display:none}
-  .valLbl{font-size:8pt;min-width:26px}
+  /* Override pointer:coarse 40px — use smaller buttons so all rows are visible */
+  .btn{height:34px!important;min-width:34px!important;font-size:12pt!important;padding:2px 6px!important}
+  .valLbl{font-size:8pt;min-width:24px}
   .lbl{font-size:8pt}
+  #sliderRow{height:40px!important}
   #speedSlider{width:64px!important}
   #volSlider{width:44px!important}
   #warpSpeedSlider{width:48px!important}
@@ -109,7 +112,7 @@ input[type=range].inlineSlider::-moz-range-thumb{width:14px;height:14px;border-r
     <!-- Row 1: playback + basics -->
     <button class="btn" id="btnPlay" title="Play / Pause">▶</button>
     <input type="range" class="inlineSlider" id="speedSlider" min="1" max="100" value="10" style="width:100px" title="Playback speed"/>
-    <span class="valLbl" id="lblSpeed" style="min-width:28px">1.0×</span>
+    <span class="valLbl" id="lblSpeed" style="min-width:28px">0.1×</span>
     <button class="btn" id="btnNow"  title="Jump to today">⦿</button>
     <button class="btn" id="btnPick" title="Pick date">📅</button>
     <button class="btn" id="btnMusic" title="Ambient music">♪</button>
@@ -541,7 +544,7 @@ let state={
   selectedPlanet:null,
   playing:false,
   animStep:1,
-  animSpeed:1.0,
+  animSpeed:0.1,
   monthFontScale:1.0,
   widgetFontScale:1.0,
   starDensity:280,
@@ -1159,7 +1162,10 @@ function drawZodiac(w,h){
     const ly=labelR*Math.sin(-mr2);
     ctx.save();
     ctx.translate(lx,ly);
-    ctx.rotate(mr2);
+    // Tangential rotation: text runs along the arc instead of radially
+    let tanRot=Math.PI/2-mr2;
+    if(mr2>Math.PI) tanRot+=Math.PI;
+    ctx.rotate(tanRot);
     const symH=Math.min(bandH*0.52,16)*state.zodiacFontScale;
     const nameH=Math.min(bandH*0.32,11)*state.zodiacFontScale;
     ctx.textAlign='center';
@@ -1308,7 +1314,8 @@ function drawDateLabel(w,h){
 function drawMoonPhaseOverlay(w,h){
   const {symbol,name,illum,angle}=moonPhaseInfo(state.currentDate);
   const wfs=state.widgetFontScale||1.0;
-  const pad=12, diskR=34, boxW=170, boxH=diskR*2+52;
+  const isMobileW=w<540;
+  const pad=isMobileW?9:12, diskR=isMobileW?27:34, boxW=isMobileW?148:170, boxH=diskR*2+(isMobileW?44:52);
   const bx=pad, by=pad;
 
   // Panel background
@@ -1428,13 +1435,18 @@ function drawSunArcOverlay(w,h){
   }
 
   const wfs=state.widgetFontScale||1.0;
-  const pad=12;
-  const moonBoxH=34*2+52;
-  // Fixed box width = longest-day arc diameter + padding
-  const boxW=220, boxH=96;
   const isMobile=w<540;
-  const bx=isMobile ? (w-boxW-pad) : pad;
-  const by=isMobile ? pad : (pad+moonBoxH+6);
+  const pad=isMobile?9:12;
+  const moonBoxH=(isMobile?(27*2+44):(34*2+52));
+  // Fixed box width = longest-day arc diameter + padding
+  const boxW=isMobile?170:220, boxH=isMobile?84:96;
+  // Position: on mobile put top-right; check it won't overlap with moon widget (148px wide)
+  const moonRight=pad+(isMobile?148:170);
+  const sunLeft=isMobile?(w-boxW-pad):pad;
+  // If they'd overlap on very narrow screens, fall back to below-moon position
+  const sideBySide=isMobile&&(sunLeft>moonRight+4);
+  const bx=sideBySide?(w-boxW-pad):pad;
+  const by=sideBySide?pad:(pad+moonBoxH+6);
   const horizonFromBottom=22;
 
   if(geoLat===null){
@@ -1936,7 +1948,7 @@ document.getElementById('btnPlay').addEventListener('click',()=>{
 // Speed
 document.getElementById('speedSlider').addEventListener('input',e=>{
   state.animSpeed=parseInt(e.target.value)/100;
-  document.getElementById('lblSpeed').textContent=state.animSpeed +'×';
+  document.getElementById('lblSpeed').textContent=state.animSpeed.toFixed(2).replace(/\.?0+$/,'')+'×';
   // no timer restart needed — rAF loop reads state.animSpeed each frame
   saveSettings();
 });
